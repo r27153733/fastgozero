@@ -3,6 +3,8 @@ package rest
 import (
 	"crypto/tls"
 	"errors"
+	"github.com/valyala/fasthttp"
+	"io/fs"
 	"net/http"
 	"path"
 	"time"
@@ -109,9 +111,9 @@ func (s *Server) Routes() []Route {
 //	w := httptest.NewRecorder(...)
 //	server.ServeHTTP(w, r)
 //	// verify the response
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ServeHTTP(ctx *fasthttp.RequestCtx) {
 	s.ngin.bindRoutes(s.router)
-	s.router.ServeHTTP(w, r)
+	s.router.ServeHTTP(ctx)
 }
 
 // Start starts the Server.
@@ -139,9 +141,9 @@ func (s *Server) Use(middleware Middleware) {
 }
 
 // ToMiddleware converts the given handler to a Middleware.
-func ToMiddleware(handler func(next http.Handler) http.Handler) Middleware {
-	return func(handle http.HandlerFunc) http.HandlerFunc {
-		return handler(handle).ServeHTTP
+func ToMiddleware(handler func(next fasthttp.RequestHandler) fasthttp.RequestHandler) Middleware {
+	return func(handle fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return handler(handle)
 	}
 }
 
@@ -167,7 +169,7 @@ func WithCorsHeaders(headers ...string) RunOption {
 
 	return func(server *Server) {
 		server.router.SetNotAllowedHandler(cors.NotAllowedHandler(nil, allDomains))
-		server.router = newCorsRouter(server.router, func(header http.Header) {
+		server.router = newCorsRouter(server.router, func(header *fasthttp.ResponseHeader) {
 			cors.AddAllowHeaders(header, headers...)
 		}, allDomains)
 	}
@@ -175,7 +177,7 @@ func WithCorsHeaders(headers ...string) RunOption {
 
 // WithCustomCors returns a func to enable CORS for given origin, or default to all origins (*),
 // fn lets caller customizing the response.
-func WithCustomCors(middlewareFn func(header http.Header), notAllowedFn func(http.ResponseWriter),
+func WithCustomCors(middlewareFn func(header *fasthttp.ResponseHeader), notAllowedFn func(*fasthttp.Response),
 	origin ...string) RunOption {
 	return func(server *Server) {
 		server.router.SetNotAllowedHandler(cors.NotAllowedHandler(notAllowedFn, origin...))
@@ -184,7 +186,7 @@ func WithCustomCors(middlewareFn func(header http.Header), notAllowedFn func(htt
 }
 
 // WithFileServer returns a RunOption to serve files from given dir with given path.
-func WithFileServer(path string, fs http.FileSystem) RunOption {
+func WithFileServer(path string, fs fs.FS) RunOption {
 	return func(server *Server) {
 		server.router = newFileServingRouter(server.router, path, fs)
 	}
@@ -244,7 +246,7 @@ func WithMiddleware(middleware Middleware, rs ...Route) []Route {
 }
 
 // WithNotFoundHandler returns a RunOption with not found handler set to given handler.
-func WithNotFoundHandler(handler http.Handler) RunOption {
+func WithNotFoundHandler(handler fasthttp.RequestHandler) RunOption {
 	return func(server *Server) {
 		notFoundHandler := server.ngin.notFoundHandler(handler)
 		server.router.SetNotFoundHandler(notFoundHandler)
@@ -252,7 +254,7 @@ func WithNotFoundHandler(handler http.Handler) RunOption {
 }
 
 // WithNotAllowedHandler returns a RunOption with not allowed handler set to given handler.
-func WithNotAllowedHandler(handler http.Handler) RunOption {
+func WithNotAllowedHandler(handler fasthttp.RequestHandler) RunOption {
 	return func(server *Server) {
 		server.router.SetNotAllowedHandler(handler)
 	}
@@ -347,15 +349,15 @@ type corsRouter struct {
 	middleware Middleware
 }
 
-func newCorsRouter(router httpx.Router, headerFn func(http.Header), origins ...string) httpx.Router {
+func newCorsRouter(router httpx.Router, headerFn func(header *fasthttp.ResponseHeader), origins ...string) httpx.Router {
 	return &corsRouter{
 		Router:     router,
 		middleware: cors.Middleware(headerFn, origins...),
 	}
 }
 
-func (c *corsRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c.middleware(c.Router.ServeHTTP)(w, r)
+func (c *corsRouter) ServeHTTP(ctx *fasthttp.RequestCtx) {
+	c.middleware(c.Router.ServeHTTP)(ctx)
 }
 
 type fileServingRouter struct {
@@ -363,13 +365,13 @@ type fileServingRouter struct {
 	middleware Middleware
 }
 
-func newFileServingRouter(router httpx.Router, path string, fs http.FileSystem) httpx.Router {
+func newFileServingRouter(router httpx.Router, path string, fs fs.FS) httpx.Router {
 	return &fileServingRouter{
 		Router:     router,
 		middleware: fileserver.Middleware(path, fs),
 	}
 }
 
-func (f *fileServingRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	f.middleware(f.Router.ServeHTTP)(w, r)
+func (f *fileServingRouter) ServeHTTP(ctx *fasthttp.RequestCtx) {
+	f.middleware(f.Router.ServeHTTP)(ctx)
 }

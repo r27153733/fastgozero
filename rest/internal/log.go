@@ -2,9 +2,8 @@ package internal
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"net/http"
+	"github.com/valyala/fasthttp"
 	"sync"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -24,13 +23,18 @@ type (
 	contextKey string
 )
 
-// WithLogCollector returns a new context with LogCollector.
-func WithLogCollector(ctx context.Context, lc *LogCollector) context.Context {
-	return context.WithValue(ctx, logContextKey, lc)
+// SetLogCollector returns a new context with LogCollector.
+func SetLogCollector(ctx *fasthttp.RequestCtx, lc *LogCollector) (free func()) {
+	// logContextKey is private.
+	// so we can guarantee that the key will not be overwritten.
+	ctx.SetUserValue(logContextKey, lc)
+	return func() {
+		ctx.RemoveUserValue(logContextKey)
+	}
 }
 
 // LogCollectorFromContext returns LogCollector from ctx.
-func LogCollectorFromContext(ctx context.Context) *LogCollector {
+func LogCollectorFromContext(ctx *fasthttp.RequestCtx) *LogCollector {
 	val := ctx.Value(logContextKey)
 	if val == nil {
 		return nil
@@ -73,40 +77,40 @@ func (lc *LogCollector) takeAll() []string {
 }
 
 // Error logs the given v along with r in error log.
-func Error(r *http.Request, v ...any) {
-	logx.WithContext(r.Context()).Error(format(r, v...))
+func Error(r *fasthttp.RequestCtx, v ...any) {
+	logx.WithContext(r).Error(format(r, v...))
 }
 
 // Errorf logs the given v with format along with r in error log.
-func Errorf(r *http.Request, format string, v ...any) {
-	logx.WithContext(r.Context()).Error(formatf(r, format, v...))
+func Errorf(r *fasthttp.RequestCtx, format string, v ...any) {
+	logx.WithContext(r).Error(formatf(r, format, v...))
 }
 
 // Info logs the given v along with r in access log.
-func Info(r *http.Request, v ...any) {
+func Info(r *fasthttp.RequestCtx, v ...any) {
 	appendLog(r, format(r, v...))
 }
 
 // Infof logs the given v with format along with r in access log.
-func Infof(r *http.Request, format string, v ...any) {
+func Infof(r *fasthttp.RequestCtx, format string, v ...any) {
 	appendLog(r, formatf(r, format, v...))
 }
 
-func appendLog(r *http.Request, message string) {
-	logs := LogCollectorFromContext(r.Context())
+func appendLog(r *fasthttp.RequestCtx, message string) {
+	logs := LogCollectorFromContext(r)
 	if logs != nil {
 		logs.Append(message)
 	}
 }
 
-func format(r *http.Request, v ...any) string {
+func format(r *fasthttp.RequestCtx, v ...any) string {
 	return formatWithReq(r, fmt.Sprint(v...))
 }
 
-func formatf(r *http.Request, format string, v ...any) string {
+func formatf(r *fasthttp.RequestCtx, format string, v ...any) string {
 	return formatWithReq(r, fmt.Sprintf(format, v...))
 }
 
-func formatWithReq(r *http.Request, v string) string {
-	return fmt.Sprintf("(%s - %s) %s", r.RequestURI, httpx.GetRemoteAddr(r), v)
+func formatWithReq(r *fasthttp.RequestCtx, v string) string {
+	return fmt.Sprintf("(%s - %s) %s", r.RequestURI(), httpx.GetRemoteAddr(r), v)
 }

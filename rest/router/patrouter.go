@@ -2,6 +2,8 @@ package router
 
 import (
 	"errors"
+	"github.com/valyala/fasthttp"
+	"github.com/zeromicro/go-zero/fastext"
 	"net/http"
 	"path"
 	"strings"
@@ -25,8 +27,8 @@ var (
 
 type patRouter struct {
 	trees      map[string]*search.Tree
-	notFound   http.Handler
-	notAllowed http.Handler
+	notFound   fasthttp.RequestHandler
+	notAllowed fasthttp.RequestHandler
 }
 
 // NewRouter returns a httpx.Router.
@@ -36,7 +38,7 @@ func NewRouter() httpx.Router {
 	}
 }
 
-func (pr *patRouter) Handle(method, reqPath string, handler http.Handler) error {
+func (pr *patRouter) Handle(method, reqPath string, handler fasthttp.RequestHandler) error {
 	if !validMethod(method) {
 		return ErrInvalidMethod
 	}
@@ -56,45 +58,46 @@ func (pr *patRouter) Handle(method, reqPath string, handler http.Handler) error 
 	return tree.Add(cleanPath, handler)
 }
 
-func (pr *patRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	reqPath := path.Clean(r.URL.Path)
-	if tree, ok := pr.trees[r.Method]; ok {
+func (pr *patRouter) ServeHTTP(ctx *fasthttp.RequestCtx) {
+	reqPath := path.Clean(fastext.B2s(ctx.Request.URI().Path()))
+	if tree, ok := pr.trees[fastext.B2s(ctx.Method())]; ok {
 		if result, ok := tree.Search(reqPath); ok {
 			if len(result.Params) > 0 {
-				r = pathvar.WithVars(r, result.Params)
+				free := pathvar.SetVars(ctx, result.Params)
+				defer free()
 			}
-			result.Item.(http.Handler).ServeHTTP(w, r)
+			result.Item.(fasthttp.RequestHandler)(ctx)
 			return
 		}
 	}
 
-	allows, ok := pr.methodsAllowed(r.Method, reqPath)
+	allows, ok := pr.methodsAllowed(fastext.B2s(ctx.Method()), reqPath)
 	if !ok {
-		pr.handleNotFound(w, r)
+		pr.handleNotFound(ctx)
 		return
 	}
 
 	if pr.notAllowed != nil {
-		pr.notAllowed.ServeHTTP(w, r)
+		pr.notAllowed(ctx)
 	} else {
-		w.Header().Set(allowHeader, allows)
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		ctx.Response.Header.Set(allowHeader, allows)
+		ctx.SetStatusCode(http.StatusMethodNotAllowed)
 	}
 }
 
-func (pr *patRouter) SetNotFoundHandler(handler http.Handler) {
+func (pr *patRouter) SetNotFoundHandler(handler fasthttp.RequestHandler) {
 	pr.notFound = handler
 }
 
-func (pr *patRouter) SetNotAllowedHandler(handler http.Handler) {
+func (pr *patRouter) SetNotAllowedHandler(handler fasthttp.RequestHandler) {
 	pr.notAllowed = handler
 }
 
-func (pr *patRouter) handleNotFound(w http.ResponseWriter, r *http.Request) {
+func (pr *patRouter) handleNotFound(ctx *fasthttp.RequestCtx) {
 	if pr.notFound != nil {
-		pr.notFound.ServeHTTP(w, r)
+		pr.notFound(ctx)
 	} else {
-		http.NotFound(w, r)
+		ctx.NotFound()
 	}
 }
 

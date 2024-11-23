@@ -5,38 +5,39 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/breaker"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/stat"
+	"github.com/zeromicro/go-zero/fastext"
 	"github.com/zeromicro/go-zero/rest/httpx"
-	"github.com/zeromicro/go-zero/rest/internal/response"
 )
 
 const breakerSeparator = "://"
 
 // BreakerHandler returns a break circuit middleware.
-func BreakerHandler(method, path string, metrics *stat.Metrics) func(http.Handler) http.Handler {
+func BreakerHandler(method, path string, metrics *stat.Metrics) func(fasthttp.RequestHandler) fasthttp.RequestHandler {
 	brk := breaker.NewBreaker(breaker.WithName(strings.Join([]string{method, path}, breakerSeparator)))
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
 			promise, err := brk.Allow()
 			if err != nil {
 				metrics.AddDrop()
 				logx.Errorf("[http] dropped, %s - %s - %s",
-					r.RequestURI, httpx.GetRemoteAddr(r), r.UserAgent())
-				w.WriteHeader(http.StatusServiceUnavailable)
+					fastext.B2s(ctx.RequestURI()), httpx.GetRemoteAddr(ctx), fastext.B2s(ctx.UserAgent()))
+				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 				return
 			}
 
-			cw := response.NewWithCodeResponseWriter(w)
 			defer func() {
-				if cw.Code < http.StatusInternalServerError {
+				code := ctx.Response.StatusCode()
+				if code < fasthttp.StatusInternalServerError {
 					promise.Accept()
 				} else {
-					promise.Reject(fmt.Sprintf("%d %s", cw.Code, http.StatusText(cw.Code)))
+					promise.Reject(fmt.Sprintf("%d %s", code, http.StatusText(code)))
 				}
 			}()
-			next.ServeHTTP(cw, r)
-		})
+			next(ctx)
+		}
 	}
 }

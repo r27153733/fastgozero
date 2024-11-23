@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/stat"
 )
 
@@ -16,18 +17,17 @@ func init() {
 
 func TestBreakerHandlerAccept(t *testing.T) {
 	metrics := stat.NewMetrics("unit-test")
-	breakerHandler := BreakerHandler(http.MethodGet, "/", metrics)
-	handler := breakerHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Test", "test")
-		_, err := w.Write([]byte("content"))
-		assert.Nil(t, err)
-	}))
+	breakerHandler := BreakerHandler(fasthttp.MethodGet, "/", metrics)
+	handler := breakerHandler(func(ctx *fasthttp.RequestCtx) {
+		ctx.Response.Header.Set("X-Test", "test")
+		ctx.Response.AppendBodyString("content")
+	})
 
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
+	req := httptest.NewRequest(fasthttp.MethodGet, "http://localhost", http.NoBody)
 	req.Header.Set("X-Test", "test")
 	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	handler()
+	assert.Equal(t, fasthttp.StatusOK, resp.Code)
 	assert.Equal(t, "test", resp.Header().Get("X-Test"))
 	assert.Equal(t, "content", resp.Body.String())
 }

@@ -1,15 +1,15 @@
 package pathvar
 
 import (
-	"context"
-	"net/http"
+	"github.com/valyala/fasthttp"
+	"github.com/zeromicro/go-zero/fastext"
 )
 
 var pathVars = contextKey("pathVars")
 
 // Vars parses path variables and returns a map.
-func Vars(r *http.Request) map[string]string {
-	vars, ok := r.Context().Value(pathVars).(map[string]string)
+func Vars(r *fasthttp.RequestCtx) map[string]string {
+	vars, ok := r.Value(pathVars).(map[string]string)
 	if ok {
 		return vars
 	}
@@ -17,9 +17,9 @@ func Vars(r *http.Request) map[string]string {
 	return nil
 }
 
-// WithVars writes params into given r and returns a new http.Request.
-func WithVars(r *http.Request, params map[string]string) *http.Request {
-	return r.WithContext(context.WithValue(r.Context(), pathVars, params))
+// SetVars writes params into given r.
+func SetVars(r *fasthttp.RequestCtx, params map[string]string) (free func()) {
+	return fastext.SetUserValueCtx(r, pathVars, params)
 }
 
 type contextKey string

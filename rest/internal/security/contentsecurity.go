@@ -5,15 +5,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
+	"github.com/valyala/fasthttp"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/zeromicro/go-zero/core/codec"
-	"github.com/zeromicro/go-zero/core/iox"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
@@ -51,9 +49,8 @@ func (h *ContentSecurityHeader) Encrypted() bool {
 }
 
 // ParseContentSecurity parses content security settings in give r.
-func ParseContentSecurity(decrypters map[string]codec.RsaDecrypter, r *http.Request) (
+func ParseContentSecurity(decrypters map[string]codec.RsaDecrypter, contentSecurity string) (
 	*ContentSecurityHeader, error) {
-	contentSecurity := r.Header.Get(httpx.ContentSecurity)
 	attrs := httpx.ParseHeader(contentSecurity)
 	fingerprint := attrs[httpx.KeyField]
 	secret := attrs[httpx.SecretField]
@@ -97,7 +94,7 @@ func ParseContentSecurity(decrypters map[string]codec.RsaDecrypter, r *http.Requ
 }
 
 // VerifySignature verifies the signature in given r.
-func VerifySignature(r *http.Request, securityHeader *ContentSecurityHeader, tolerance time.Duration) int {
+func VerifySignature(r *fasthttp.Request, securityHeader *ContentSecurityHeader, tolerance time.Duration) int {
 	seconds, err := strconv.ParseInt(securityHeader.Timestamp, 10, 64)
 	if err != nil {
 		return httpx.CodeSignatureInvalidHeader
@@ -112,7 +109,7 @@ func VerifySignature(r *http.Request, securityHeader *ContentSecurityHeader, tol
 	reqPath, reqQuery := getPathQuery(r)
 	signContent := strings.Join([]string{
 		securityHeader.Timestamp,
-		r.Method,
+		string(r.Header.Method()),
 		reqPath,
 		reqQuery,
 		computeBodySignature(r),
@@ -129,24 +126,21 @@ func VerifySignature(r *http.Request, securityHeader *ContentSecurityHeader, tol
 	return httpx.CodeSignatureInvalidToken
 }
 
-func computeBodySignature(r *http.Request) string {
-	var dup io.ReadCloser
-	r.Body, dup = iox.DupReadCloser(r.Body)
+func computeBodySignature(r *fasthttp.Request) string {
 	sha := sha256.New()
-	io.Copy(sha, r.Body)
-	r.Body = dup
+	sha.Write(r.Body())
 	return fmt.Sprintf("%x", sha.Sum(nil))
 }
 
-func getPathQuery(r *http.Request) (string, string) {
-	requestUri := r.Header.Get(requestUriHeader)
+func getPathQuery(r *fasthttp.Request) (string, string) {
+	requestUri := string(r.Header.Peek(requestUriHeader))
 	if len(requestUri) == 0 {
-		return r.URL.Path, r.URL.RawQuery
+		return string(r.URI().Path()), string(r.URI().QueryString())
 	}
 
 	uri, err := url.Parse(requestUri)
 	if err != nil {
-		return r.URL.Path, r.URL.RawQuery
+		return string(r.URI().Path()), string(r.URI().QueryString())
 	}
 
 	return uri.Path, uri.RawQuery

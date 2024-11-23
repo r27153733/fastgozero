@@ -1,19 +1,19 @@
 package rest
 
 import (
-	"net/http"
+	"github.com/valyala/fasthttp"
 	"time"
 )
 
 type (
 	// Middleware defines the middleware method.
-	Middleware func(next http.HandlerFunc) http.HandlerFunc
+	Middleware func(next fasthttp.RequestHandler) fasthttp.RequestHandler
 
 	// A Route is a http route.
 	Route struct {
 		Method  string
 		Path    string
-		Handler http.HandlerFunc
+		Handler fasthttp.RequestHandler
 	}
 
 	// RouteOption defines the method to customize a featured route.

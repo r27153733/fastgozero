@@ -1,13 +1,13 @@
 package token
 
 import (
-	"net/http"
+	"github.com/valyala/fasthttp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/golang-jwt/jwt/v4/request"
 	"github.com/zeromicro/go-zero/core/timex"
 )
 
@@ -40,7 +40,7 @@ func NewTokenParser(opts ...ParseOption) *TokenParser {
 }
 
 // ParseToken parses token from given r, with passed in secret and prevSecret.
-func (tp *TokenParser) ParseToken(r *http.Request, secret, prevSecret string) (*jwt.Token, error) {
+func (tp *TokenParser) ParseToken(r *fasthttp.Request, secret, prevSecret string) (*jwt.Token, error) {
 	var token *jwt.Token
 	var err error
 
@@ -78,11 +78,17 @@ func (tp *TokenParser) ParseToken(r *http.Request, secret, prevSecret string) (*
 	return token, nil
 }
 
-func (tp *TokenParser) doParseToken(r *http.Request, secret string) (*jwt.Token, error) {
-	return request.ParseFromRequest(r, request.AuthorizationHeaderExtractor,
-		func(token *jwt.Token) (any, error) {
-			return []byte(secret), nil
-		}, request.WithParser(newParser()))
+const authorization = "Authorization"
+
+func (tp *TokenParser) doParseToken(r *fasthttp.Request, secret string) (*jwt.Token, error) {
+	tokenStr := string(r.Header.Peek(authorization))
+	if len(tokenStr) > 6 && strings.ToUpper(tokenStr[0:7]) == "BEARER " {
+		tokenStr = tokenStr[7:]
+	}
+
+	return newParser().ParseWithClaims(tokenStr, jwt.MapClaims{}, func(token *jwt.Token) (any, error) {
+		return []byte(secret), nil
+	})
 }
 
 func (tp *TokenParser) incrementCount(secret string) {

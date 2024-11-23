@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"net/http"
+	"github.com/valyala/fasthttp"
 	"sort"
 	"time"
 
@@ -15,7 +15,6 @@ import (
 	"github.com/zeromicro/go-zero/rest/handler"
 	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/zeromicro/go-zero/rest/internal"
-	"github.com/zeromicro/go-zero/rest/internal/response"
 )
 
 // use 1000m to represent 100%
@@ -104,7 +103,7 @@ func (ng *engine) bindRoute(fr featuredRoutes, router httpx.Router, metrics *sta
 	chn = ng.appendAuthHandler(fr, chn, verifier)
 
 	for _, middleware := range ng.middlewares {
-		chn = chn.Append(convertMiddleware(middleware))
+		chn = chn.Append(chain.Middleware(middleware))
 	}
 	handle := chn.ThenFunc(route.Handler)
 
@@ -194,7 +193,7 @@ func (ng *engine) createMetrics() *stat.Metrics {
 	return metrics
 }
 
-func (ng *engine) getLogHandler() func(http.Handler) http.Handler {
+func (ng *engine) getLogHandler() func(fasthttp.RequestHandler) fasthttp.RequestHandler {
 	if ng.conf.Verbose {
 		return handler.DetailedLogHandler
 	}
@@ -211,8 +210,8 @@ func (ng *engine) getShedder(priority bool) load.Shedder {
 }
 
 // notFoundHandler returns a middleware that handles 404 not found requests.
-func (ng *engine) notFoundHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (ng *engine) notFoundHandler(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
 		chn := chain.New(
 			handler.TraceHandler(ng.conf.Name,
 				"",
@@ -223,17 +222,18 @@ func (ng *engine) notFoundHandler(next http.Handler) http.Handler {
 			chn = chn.Append(ng.getLogHandler())
 		}
 
-		var h http.Handler
+		var h fasthttp.RequestHandler
 		if next != nil {
 			h = chn.Then(next)
 		} else {
-			h = chn.Then(http.NotFoundHandler())
+			h = chn.Then(func(ctx *fasthttp.RequestCtx) {
+				ctx.NotFound()
+			})
 		}
 
-		cw := response.NewHeaderOnceResponseWriter(w)
-		h.ServeHTTP(cw, r)
-		cw.WriteHeader(http.StatusNotFound)
-	})
+		h(ctx)
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+	}
 }
 
 func (ng *engine) print() {
@@ -314,12 +314,12 @@ func (ng *engine) start(router httpx.Router, opts ...StartOption) error {
 	opts = append([]StartOption{ng.withTimeout()}, opts...)
 
 	if len(ng.conf.CertFile) == 0 && len(ng.conf.KeyFile) == 0 {
-		return internal.StartHttp(ng.conf.Host, ng.conf.Port, router, opts...)
+		return internal.StartHttp(ng.conf.Host, ng.conf.Port, router.ServeHTTP, opts...)
 	}
 
 	// make sure user defined options overwrite default options
 	opts = append([]StartOption{
-		func(svr *http.Server) {
+		func(svr *fasthttp.Server) {
 			if ng.tlsConfig != nil {
 				svr.TLSConfig = ng.tlsConfig
 			}
@@ -327,7 +327,7 @@ func (ng *engine) start(router httpx.Router, opts ...StartOption) error {
 	}, opts...)
 
 	return internal.StartHttps(ng.conf.Host, ng.conf.Port, ng.conf.CertFile,
-		ng.conf.KeyFile, router, opts...)
+		ng.conf.KeyFile, router.ServeHTTP, opts...)
 }
 
 func (ng *engine) use(middleware Middleware) {
@@ -335,7 +335,7 @@ func (ng *engine) use(middleware Middleware) {
 }
 
 func (ng *engine) withTimeout() internal.StartOption {
-	return func(svr *http.Server) {
+	return func(svr *fasthttp.Server) {
 		timeout := ng.timeout
 		if timeout > 0 {
 			// factor 0.8, to avoid clients send longer content-length than the actual content,
@@ -346,11 +346,5 @@ func (ng *engine) withTimeout() internal.StartOption {
 			// setting the factor less than 1.0 may lead clients not receiving the responses.
 			svr.WriteTimeout = 11 * timeout / 10
 		}
-	}
-}
-
-func convertMiddleware(ware Middleware) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return ware(next.ServeHTTP)
 	}
 }

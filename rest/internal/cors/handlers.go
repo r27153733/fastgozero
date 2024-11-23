@@ -1,10 +1,10 @@
 package cors
 
 import (
+	"github.com/valyala/fasthttp"
+	"github.com/zeromicro/go-zero/fastext"
 	"net/http"
 	"strings"
-
-	"github.com/zeromicro/go-zero/rest/internal/response"
 )
 
 const (
@@ -27,57 +27,56 @@ const (
 )
 
 // AddAllowHeaders sets the allowed headers.
-func AddAllowHeaders(header http.Header, headers ...string) {
+func AddAllowHeaders(header *fasthttp.ResponseHeader, headers ...string) {
 	header.Add(allowHeaders, strings.Join(headers, ", "))
 }
 
 // NotAllowedHandler handles cross domain not allowed requests.
 // At most one origin can be specified, other origins are ignored if given, default to be *.
-func NotAllowedHandler(fn func(w http.ResponseWriter), origins ...string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gw := response.NewHeaderOnceResponseWriter(w)
-		checkAndSetHeaders(gw, r, origins)
+func NotAllowedHandler(fn func(w *fasthttp.Response), origins ...string) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		checkAndSetHeaders(ctx, origins)
 		if fn != nil {
-			fn(gw)
+			fn(&ctx.Response)
 		}
 
-		if r.Method == http.MethodOptions {
-			gw.WriteHeader(http.StatusNoContent)
+		if ctx.IsOptions() {
+			ctx.SetStatusCode(http.StatusNoContent)
 		} else {
-			gw.WriteHeader(http.StatusNotFound)
+			ctx.SetStatusCode(http.StatusNotFound)
 		}
-	})
+	}
 }
 
 // Middleware returns a middleware that adds CORS headers to the response.
-func Middleware(fn func(w http.Header), origins ...string) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			checkAndSetHeaders(w, r, origins)
+func Middleware(fn func(w *fasthttp.ResponseHeader), origins ...string) func(fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			checkAndSetHeaders(ctx, origins)
 			if fn != nil {
-				fn(w.Header())
+				fn(&ctx.Response.Header)
 			}
 
-			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusNoContent)
+			if ctx.IsOptions() {
+				ctx.SetStatusCode(http.StatusNoContent)
 			} else {
-				next(w, r)
+				next(ctx)
 			}
 		}
 	}
 }
 
-func checkAndSetHeaders(w http.ResponseWriter, r *http.Request, origins []string) {
-	setVaryHeaders(w, r)
+func checkAndSetHeaders(ctx *fasthttp.RequestCtx, origins []string) {
+	setVaryHeaders(ctx)
 
 	if len(origins) == 0 {
-		setHeader(w, allOrigins)
+		setHeader(&ctx.Response, allOrigins)
 		return
 	}
 
-	origin := r.Header.Get(originHeader)
+	origin := fastext.B2s(ctx.Request.Header.Peek(originHeader))
 	if isOriginAllowed(origins, origin) {
-		setHeader(w, origin)
+		setHeader(&ctx.Response, origin)
 	}
 }
 
@@ -102,23 +101,21 @@ func isOriginAllowed(allows []string, origin string) bool {
 	return false
 }
 
-func setHeader(w http.ResponseWriter, origin string) {
-	header := w.Header()
-	header.Set(allowOrigin, origin)
-	header.Set(allowMethods, methods)
-	header.Set(allowHeaders, allowHeadersVal)
-	header.Set(exposeHeaders, exposeHeadersVal)
+func setHeader(w *fasthttp.Response, origin string) {
+	w.Header.Set(allowOrigin, origin)
+	w.Header.Set(allowMethods, methods)
+	w.Header.Set(allowHeaders, allowHeadersVal)
+	w.Header.Set(exposeHeaders, exposeHeadersVal)
 	if origin != allOrigins {
-		header.Set(allowCredentials, allowTrue)
+		w.Header.Set(allowCredentials, allowTrue)
 	}
-	header.Set(maxAgeHeader, maxAgeHeaderVal)
+	w.Header.Set(maxAgeHeader, maxAgeHeaderVal)
 }
 
-func setVaryHeaders(w http.ResponseWriter, r *http.Request) {
-	header := w.Header()
-	header.Add(varyHeader, originHeader)
-	if r.Method == http.MethodOptions {
-		header.Add(varyHeader, requestMethod)
-		header.Add(varyHeader, requestHeaders)
+func setVaryHeaders(ctx *fasthttp.RequestCtx) {
+	ctx.Response.Header.Add(varyHeader, originHeader)
+	if ctx.IsOptions() {
+		ctx.Response.Header.Add(varyHeader, requestMethod)
+		ctx.Response.Header.Add(varyHeader, requestHeaders)
 	}
 }

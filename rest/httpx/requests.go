@@ -1,8 +1,9 @@
 package httpx
 
 import (
+	"github.com/valyala/fasthttp"
+	"github.com/zeromicro/go-zero/fastext"
 	"io"
-	"net/http"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -39,46 +40,46 @@ var (
 // Validator defines the interface for validating the request.
 type Validator interface {
 	// Validate validates the request and parsed data.
-	Validate(r *http.Request, data any) error
+	Validate(r *fasthttp.Request, data any) error
 }
 
 // Parse parses the request.
-func Parse(r *http.Request, v any) error {
+func Parse(r *fasthttp.RequestCtx, v any) error {
 	kind := mapping.Deref(reflect.TypeOf(v)).Kind()
 	if kind != reflect.Array && kind != reflect.Slice {
 		if err := ParsePath(r, v); err != nil {
 			return err
 		}
 
-		if err := ParseForm(r, v); err != nil {
+		if err := ParseForm(&r.Request, v); err != nil {
 			return err
 		}
 
-		if err := ParseHeaders(r, v); err != nil {
+		if err := ParseHeaders(&r.Request, v); err != nil {
 			return err
 		}
 	}
 
-	if err := ParseJsonBody(r, v); err != nil {
+	if err := ParseJsonBody(&r.Request, v); err != nil {
 		return err
 	}
 
 	if valid, ok := v.(validation.Validator); ok {
 		return valid.Validate()
 	} else if val := validator.Load(); val != nil {
-		return val.(Validator).Validate(r, v)
+		return val.(Validator).Validate(&r.Request, v)
 	}
 
 	return nil
 }
 
 // ParseHeaders parses the headers request.
-func ParseHeaders(r *http.Request, v any) error {
-	return encoding.ParseHeaders(r.Header, v)
+func ParseHeaders(r *fasthttp.Request, v any) error {
+	return encoding.ParseHeaders(&r.Header, v)
 }
 
 // ParseForm parses the form request.
-func ParseForm(r *http.Request, v any) error {
+func ParseForm(r *fasthttp.Request, v any) error {
 	params, err := GetFormValues(r)
 	if err != nil {
 		return err
@@ -110,9 +111,9 @@ func ParseHeader(headerValue string) map[string]string {
 }
 
 // ParseJsonBody parses the post request which contains json in body.
-func ParseJsonBody(r *http.Request, v any) error {
+func ParseJsonBody(r *fasthttp.Request, v any) error {
 	if withJsonBody(r) {
-		reader := io.LimitReader(r.Body, maxBodyLen)
+		reader := io.LimitReader(r.BodyStream(), maxBodyLen)
 		return mapping.UnmarshalJsonReader(reader, v)
 	}
 
@@ -121,7 +122,7 @@ func ParseJsonBody(r *http.Request, v any) error {
 
 // ParsePath parses the symbols reside in url path.
 // Like http://localhost/bag/:name
-func ParsePath(r *http.Request, v any) error {
+func ParsePath(r *fasthttp.RequestCtx, v any) error {
 	vars := pathvar.Vars(r)
 	m := make(map[string]any, len(vars))
 	for k, v := range vars {
@@ -138,6 +139,6 @@ func SetValidator(val Validator) {
 	validator.Store(val)
 }
 
-func withJsonBody(r *http.Request) bool {
-	return r.ContentLength > 0 && strings.Contains(r.Header.Get(header.ContentType), header.ApplicationJson)
+func withJsonBody(r *fasthttp.Request) bool {
+	return r.Header.ContentLength() > 0 && strings.Contains(fastext.B2s(r.Header.Peek(header.ContentType)), header.ApplicationJson)
 }

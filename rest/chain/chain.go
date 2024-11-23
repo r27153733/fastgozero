@@ -6,19 +6,21 @@ package chain
 // - Added the Chain interface
 // - Added support for the Chain.Prepend(...) method
 
-import "net/http"
+import (
+	"github.com/valyala/fasthttp"
+)
 
 type (
 	// Chain defines a chain of middleware.
 	Chain interface {
 		Append(middlewares ...Middleware) Chain
 		Prepend(middlewares ...Middleware) Chain
-		Then(h http.Handler) http.Handler
-		ThenFunc(fn http.HandlerFunc) http.Handler
+		Then(h fasthttp.RequestHandler) fasthttp.RequestHandler
+		ThenFunc(fn fasthttp.RequestHandler) fasthttp.RequestHandler
 	}
 
 	// Middleware is an HTTP middleware.
-	Middleware func(http.Handler) http.Handler
+	Middleware func(fasthttp.RequestHandler) fasthttp.RequestHandler
 
 	// chain acts as a list of http.Handler middlewares.
 	// chain is effectively immutable:
@@ -78,9 +80,9 @@ func (c chain) Prepend(middlewares ...Middleware) Chain {
 // For proper middleware, this should cause no problems.
 //
 // Then() treats nil as http.DefaultServeMux.
-func (c chain) Then(h http.Handler) http.Handler {
+func (c chain) Then(h fasthttp.RequestHandler) fasthttp.RequestHandler {
 	if h == nil {
-		h = http.DefaultServeMux
+		return DefaultServeMux
 	}
 
 	for i := range c.middlewares {
@@ -89,6 +91,8 @@ func (c chain) Then(h http.Handler) http.Handler {
 
 	return h
 }
+
+var DefaultServeMux = func(*fasthttp.RequestCtx) {}
 
 // ThenFunc works identically to Then, but takes
 // a HandlerFunc instead of a Handler.
@@ -99,7 +103,7 @@ func (c chain) Then(h http.Handler) http.Handler {
 //	c.ThenFunc(fn)
 //
 // ThenFunc provides all the guarantees of Then.
-func (c chain) ThenFunc(fn http.HandlerFunc) http.Handler {
+func (c chain) ThenFunc(fn fasthttp.RequestHandler) fasthttp.RequestHandler {
 	// This nil check cannot be removed due to the "nil is not nil" common mistake in Go.
 	// Required due to: https://stackoverflow.com/questions/33426977/how-to-golang-check-a-variable-is-nil
 	if fn == nil {

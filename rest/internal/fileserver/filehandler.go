@@ -1,30 +1,30 @@
 package fileserver
 
 import (
-	"net/http"
+	"github.com/valyala/fasthttp"
+	"github.com/zeromicro/go-zero/fastext"
+	"io/fs"
 	"strings"
 	"sync"
 )
 
 // Middleware returns a middleware that serves files from the given file system.
-func Middleware(path string, fs http.FileSystem) func(http.HandlerFunc) http.HandlerFunc {
-	fileServer := http.FileServer(fs)
+func Middleware(path string, fs fs.FS) func(fasthttp.RequestHandler) fasthttp.RequestHandler {
 	pathWithoutTrailSlash := ensureNoTrailingSlash(path)
 	canServe := createServeChecker(path, fs)
 
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			if canServe(r) {
-				r.URL.Path = r.URL.Path[len(pathWithoutTrailSlash):]
-				fileServer.ServeHTTP(w, r)
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			if canServe(&ctx.Request) {
+				fasthttp.ServeFS(ctx, fs, fastext.B2s(ctx.URI().Path()[len(pathWithoutTrailSlash):]))
 			} else {
-				next(w, r)
+				next(ctx)
 			}
 		}
 	}
 }
 
-func createFileChecker(fs http.FileSystem) func(string) bool {
+func createFileChecker(fs fs.FS) func(string) bool {
 	var lock sync.RWMutex
 	fileChecker := make(map[string]bool)
 
@@ -51,14 +51,14 @@ func createFileChecker(fs http.FileSystem) func(string) bool {
 	}
 }
 
-func createServeChecker(path string, fs http.FileSystem) func(r *http.Request) bool {
+func createServeChecker(path string, fs fs.FS) func(r *fasthttp.Request) bool {
 	pathWithTrailSlash := ensureTrailingSlash(path)
 	fileChecker := createFileChecker(fs)
 
-	return func(r *http.Request) bool {
-		return r.Method == http.MethodGet &&
-			strings.HasPrefix(r.URL.Path, pathWithTrailSlash) &&
-			fileChecker(r.URL.Path[len(pathWithTrailSlash):])
+	return func(r *fasthttp.Request) bool {
+		return r.Header.IsGet() &&
+			strings.HasPrefix(fastext.B2s(r.URI().Path()), pathWithTrailSlash) &&
+			fileChecker(fastext.B2s(r.URI().Path()[len(pathWithTrailSlash):]))
 	}
 }
 

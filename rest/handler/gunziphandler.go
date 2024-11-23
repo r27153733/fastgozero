@@ -1,28 +1,25 @@
 package handler
 
 import (
-	"compress/gzip"
-	"net/http"
-	"strings"
-
-	"github.com/zeromicro/go-zero/rest/httpx"
+	"github.com/valyala/fasthttp"
+	"github.com/zeromicro/go-zero/fastext"
 )
 
 const gzipEncoding = "gzip"
 
 // GunzipHandler returns a middleware to gunzip http request body.
-func GunzipHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.Header.Get(httpx.ContentEncoding), gzipEncoding) {
-			reader, err := gzip.NewReader(r.Body)
+func GunzipHandler(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
+		if fastext.B2s(ctx.Request.Header.ContentEncoding()) == "gzip" {
+			//reader, err := ctx.Request.BodyGunzip()
+			reader, err := fasthttp.AppendGunzipBytes(ctx.Response.Body()[0:], ctx.Response.Body())
 			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
+				ctx.SetStatusCode(fasthttp.StatusBadRequest)
 				return
 			}
-
-			r.Body = reader
+			ctx.SetBody(reader)
 		}
 
-		next.ServeHTTP(w, r)
-	})
+		next(ctx)
+	}
 }

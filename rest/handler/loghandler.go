@@ -1,26 +1,20 @@
 package handler
 
 import (
-	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"net/http/httputil"
 	"strconv"
 	"time"
 
+	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/color"
-	"github.com/zeromicro/go-zero/core/iox"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/syncx"
 	"github.com/zeromicro/go-zero/core/timex"
 	"github.com/zeromicro/go-zero/core/utils"
+	"github.com/zeromicro/go-zero/fastext"
 	"github.com/zeromicro/go-zero/rest/httpx"
 	"github.com/zeromicro/go-zero/rest/internal"
-	"github.com/zeromicro/go-zero/rest/internal/response"
 )
 
 const (
@@ -31,75 +25,30 @@ const (
 var slowThreshold = syncx.ForAtomicDuration(defaultSlowThreshold)
 
 // LogHandler returns a middleware that logs http request and response.
-func LogHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func LogHandler(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
 		timer := utils.NewElapsedTimer()
 		logs := new(internal.LogCollector)
-		lrw := response.NewWithCodeResponseWriter(w)
+		free := internal.SetLogCollector(ctx, logs)
+		defer free()
+		next(ctx)
 
-		var dup io.ReadCloser
-		r.Body, dup = iox.LimitDupReadCloser(r.Body, limitBodyBytes)
-		next.ServeHTTP(lrw, r.WithContext(internal.WithLogCollector(r.Context(), logs)))
-		r.Body = dup
-		logBrief(r, lrw.Code, timer, logs)
-	})
-}
-
-type detailLoggedResponseWriter struct {
-	writer *response.WithCodeResponseWriter
-	buf    *bytes.Buffer
-}
-
-func newDetailLoggedResponseWriter(writer *response.WithCodeResponseWriter,
-	buf *bytes.Buffer) *detailLoggedResponseWriter {
-	return &detailLoggedResponseWriter{
-		writer: writer,
-		buf:    buf,
+		logBrief(ctx, timer, logs)
 	}
-}
-
-func (w *detailLoggedResponseWriter) Flush() {
-	w.writer.Flush()
-}
-
-func (w *detailLoggedResponseWriter) Header() http.Header {
-	return w.writer.Header()
-}
-
-// Hijack implements the http.Hijacker interface.
-// This expands the Response to fulfill http.Hijacker if the underlying http.ResponseWriter supports it.
-func (w *detailLoggedResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if hijacked, ok := w.writer.Writer.(http.Hijacker); ok {
-		return hijacked.Hijack()
-	}
-
-	return nil, nil, errors.New("server doesn't support hijacking")
-}
-
-func (w *detailLoggedResponseWriter) Write(bs []byte) (int, error) {
-	w.buf.Write(bs)
-	return w.writer.Write(bs)
-}
-
-func (w *detailLoggedResponseWriter) WriteHeader(code int) {
-	w.writer.WriteHeader(code)
 }
 
 // DetailedLogHandler returns a middleware that logs http request and response in details.
-func DetailedLogHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func DetailedLogHandler(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
 		timer := utils.NewElapsedTimer()
-		var buf bytes.Buffer
-		rw := response.NewWithCodeResponseWriter(w)
-		lrw := newDetailLoggedResponseWriter(rw, &buf)
 
-		var dup io.ReadCloser
-		r.Body, dup = iox.DupReadCloser(r.Body)
 		logs := new(internal.LogCollector)
-		next.ServeHTTP(lrw, r.WithContext(internal.WithLogCollector(r.Context(), logs)))
-		r.Body = dup
-		logDetails(r, lrw, timer, logs)
-	})
+		free := internal.SetLogCollector(ctx, logs)
+		defer free()
+		next(ctx)
+
+		logDetails(ctx, timer, logs)
+	}
 }
 
 // SetSlowThreshold sets the slow threshold.
@@ -107,35 +56,27 @@ func SetSlowThreshold(threshold time.Duration) {
 	slowThreshold.Set(threshold)
 }
 
-func dumpRequest(r *http.Request) string {
-	reqContent, err := httputil.DumpRequest(r, true)
-	if err != nil {
-		return err.Error()
-	}
-
-	return string(reqContent)
-}
-
 func isOkResponse(code int) bool {
 	// not server error
-	return code < http.StatusInternalServerError
+	return code < fasthttp.StatusInternalServerError
 }
 
-func logBrief(r *http.Request, code int, timer *utils.ElapsedTimer, logs *internal.LogCollector) {
+func logBrief(r *fasthttp.RequestCtx, timer *utils.ElapsedTimer, logs *internal.LogCollector) {
 	var buf bytes.Buffer
+	code := r.Response.StatusCode()
 	duration := timer.Duration()
-	logger := logx.WithContext(r.Context()).WithDuration(duration)
+	logger := logx.WithContext(r).WithDuration(duration)
 	buf.WriteString(fmt.Sprintf("[HTTP] %s - %s %s - %s - %s",
-		wrapStatusCode(code), wrapMethod(r.Method), r.RequestURI, httpx.GetRemoteAddr(r), r.UserAgent()))
+		wrapStatusCode(code), wrapMethod(fastext.B2s(r.Method())), fastext.B2s(r.RequestURI()), httpx.GetRemoteAddr(r), fastext.B2s(r.UserAgent())))
 	if duration > slowThreshold.Load() {
 		logger.Slowf("[HTTP] %s - %s %s - %s - %s - slowcall(%s)",
-			wrapStatusCode(code), wrapMethod(r.Method), r.RequestURI, httpx.GetRemoteAddr(r), r.UserAgent(),
+			wrapStatusCode(code), wrapMethod(fastext.B2s(r.Method())), fastext.B2s(r.RequestURI()), httpx.GetRemoteAddr(r), fastext.B2s(r.UserAgent()),
 			timex.ReprOfDuration(duration))
 	}
 
 	ok := isOkResponse(code)
 	if !ok {
-		buf.WriteString(fmt.Sprintf("\n%s", dumpRequest(r)))
+		buf.WriteString(fmt.Sprintf("\n%s", r.Request.String()))
 	}
 
 	body := logs.Flush()
@@ -150,17 +91,17 @@ func logBrief(r *http.Request, code int, timer *utils.ElapsedTimer, logs *intern
 	}
 }
 
-func logDetails(r *http.Request, response *detailLoggedResponseWriter, timer *utils.ElapsedTimer,
+func logDetails(ctx *fasthttp.RequestCtx, timer *utils.ElapsedTimer,
 	logs *internal.LogCollector) {
 	var buf bytes.Buffer
 	duration := timer.Duration()
-	code := response.writer.Code
-	logger := logx.WithContext(r.Context())
+	code := ctx.Response.StatusCode()
+	logger := logx.WithContext(ctx)
 	buf.WriteString(fmt.Sprintf("[HTTP] %s - %d - %s - %s\n=> %s\n",
-		r.Method, code, r.RemoteAddr, timex.ReprOfDuration(duration), dumpRequest(r)))
+		fastext.B2s(ctx.Method()), code, ctx.RemoteAddr().String(), timex.ReprOfDuration(duration), ctx.Request.String()))
 	if duration > defaultSlowThreshold {
-		logger.Slowf("[HTTP] %s - %d - %s - slowcall(%s)\n=> %s\n", r.Method, code, r.RemoteAddr,
-			fmt.Sprintf("slowcall(%s)", timex.ReprOfDuration(duration)), dumpRequest(r))
+		logger.Slowf("[HTTP] %s - %d - %s - slowcall(%s)\n=> %s\n", fastext.B2s(ctx.Method()), code, ctx.RemoteAddr().String(),
+			fmt.Sprintf("slowcall(%s)", timex.ReprOfDuration(duration)), ctx.Request.String())
 	}
 
 	body := logs.Flush()
@@ -168,7 +109,7 @@ func logDetails(r *http.Request, response *detailLoggedResponseWriter, timer *ut
 		buf.WriteString(fmt.Sprintf("%s\n", body))
 	}
 
-	respBuf := response.buf.Bytes()
+	respBuf := ctx.Response.String()
 	if len(respBuf) > 0 {
 		buf.WriteString(fmt.Sprintf("<= %s", respBuf))
 	}
@@ -183,19 +124,19 @@ func logDetails(r *http.Request, response *detailLoggedResponseWriter, timer *ut
 func wrapMethod(method string) string {
 	var colour color.Color
 	switch method {
-	case http.MethodGet:
+	case fasthttp.MethodGet:
 		colour = color.BgBlue
-	case http.MethodPost:
+	case fasthttp.MethodPost:
 		colour = color.BgCyan
-	case http.MethodPut:
+	case fasthttp.MethodPut:
 		colour = color.BgYellow
-	case http.MethodDelete:
+	case fasthttp.MethodDelete:
 		colour = color.BgRed
-	case http.MethodPatch:
+	case fasthttp.MethodPatch:
 		colour = color.BgGreen
-	case http.MethodHead:
+	case fasthttp.MethodHead:
 		colour = color.BgMagenta
-	case http.MethodOptions:
+	case fasthttp.MethodOptions:
 		colour = color.BgWhite
 	}
 
@@ -209,11 +150,11 @@ func wrapMethod(method string) string {
 func wrapStatusCode(code int) string {
 	var colour color.Color
 	switch {
-	case code >= http.StatusOK && code < http.StatusMultipleChoices:
+	case code >= fasthttp.StatusOK && code < fasthttp.StatusMultipleChoices:
 		colour = color.BgGreen
-	case code >= http.StatusMultipleChoices && code < http.StatusBadRequest:
+	case code >= fasthttp.StatusMultipleChoices && code < fasthttp.StatusBadRequest:
 		colour = color.BgBlue
-	case code >= http.StatusBadRequest && code < http.StatusInternalServerError:
+	case code >= fasthttp.StatusBadRequest && code < fasthttp.StatusInternalServerError:
 		colour = color.BgMagenta
 	default:
 		colour = color.BgYellow

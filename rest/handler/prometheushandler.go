@@ -1,12 +1,11 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
+	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/metric"
 	"github.com/zeromicro/go-zero/core/timex"
-	"github.com/zeromicro/go-zero/rest/internal/response"
 )
 
 const serverNamespace = "http_server"
@@ -31,18 +30,17 @@ var (
 )
 
 // PrometheusHandler returns a middleware that reports stats to prometheus.
-func PrometheusHandler(path, method string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func PrometheusHandler(path, method string) func(fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
 			startTime := timex.Now()
-			cw := response.NewWithCodeResponseWriter(w)
 			defer func() {
-				code := strconv.Itoa(cw.Code)
+				code := strconv.Itoa(ctx.Response.StatusCode())
 				metricServerReqDur.Observe(timex.Since(startTime).Milliseconds(), path, method, code)
 				metricServerReqCodeTotal.Inc(path, method, code)
 			}()
 
-			next.ServeHTTP(cw, r)
-		})
+			next(ctx)
+		}
 	}
 }

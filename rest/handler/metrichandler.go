@@ -1,16 +1,15 @@
 package handler
 
 import (
-	"net/http"
-
+	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/stat"
 	"github.com/zeromicro/go-zero/core/timex"
 )
 
 // MetricHandler returns a middleware that stat the metrics.
-func MetricHandler(metrics *stat.Metrics) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func MetricHandler(metrics *stat.Metrics) func(fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
 			startTime := timex.Now()
 			defer func() {
 				metrics.Add(stat.Task{
@@ -18,7 +17,7 @@ func MetricHandler(metrics *stat.Metrics) func(http.Handler) http.Handler {
 				})
 			}()
 
-			next.ServeHTTP(w, r)
-		})
+			next(ctx)
+		}
 	}
 }

@@ -1,13 +1,16 @@
 package handler
 
 import (
-	"net/http"
+	"strings"
 
+	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/collection"
 	"github.com/zeromicro/go-zero/core/trace"
-	"github.com/zeromicro/go-zero/rest/internal/response"
+	"github.com/zeromicro/go-zero/fastext"
+	"github.com/zeromicro/go-zero/fastext/otel/propagation"
+	"github.com/zeromicro/go-zero/rest/httpx"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
@@ -22,8 +25,12 @@ type (
 	}
 )
 
+var (
+	defaultTracerCtxKeys = []any{fastext.CurrentSpanKey, fastext.BaggageKey}
+)
+
 // TraceHandler return a middleware that process the opentelemetry.
-func TraceHandler(serviceName, path string, opts ...TraceOption) func(http.Handler) http.Handler {
+func TraceHandler(serviceName, path string, opts ...TraceOption) func(handler fasthttp.RequestHandler) fasthttp.RequestHandler {
 	var options traceOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -32,41 +39,91 @@ func TraceHandler(serviceName, path string, opts ...TraceOption) func(http.Handl
 	ignorePaths := collection.NewSet()
 	ignorePaths.AddStr(options.traceIgnorePaths...)
 
-	return func(next http.Handler) http.Handler {
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		tracer := otel.Tracer(trace.TraceName)
 		propagator := otel.GetTextMapPropagator()
 
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return func(ctx *fasthttp.RequestCtx) {
 			spanName := path
 			if len(spanName) == 0 {
-				spanName = r.URL.Path
+				spanName = string(ctx.URI().Path())
 			}
 
 			if ignorePaths.Contains(spanName) {
-				next.ServeHTTP(w, r)
+				next(ctx)
 				return
 			}
 
-			ctx := propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
-			spanCtx, span := tracer.Start(
+			addr := httpx.GetRemoteAddr(ctx)
+			if i := strings.Index(addr, ","); i > 0 {
+				addr = addr[:i]
+			}
+
+			attrs := []attribute.KeyValue{
+				{Key: "http.target", Value: attribute.StringValue(string(ctx.RequestURI()))},
+				{Key: "http.client_ip", Value: attribute.StringValue(addr)},
+				{Key: "http.method", Value: attribute.StringValue(string(ctx.Method()))},
+			}
+			if serviceName != "" {
+				attrs = append(attrs, attribute.String("http.server_name", serviceName))
+			}
+			if spanName != "" {
+				attrs = append(attrs, attribute.String("http.route", spanName))
+			}
+			ua := string(ctx.UserAgent())
+			if ua != "" {
+				attrs = append(attrs, attribute.String("http.user_agent", ua))
+			}
+			if contentLength := ctx.Request.Header.ContentLength(); contentLength > 0 {
+				attrs = append(attrs, attribute.Int64("http.request_content_length", int64(contentLength)))
+			}
+			if ctx.IsTLS() {
+				attrs = append(attrs, attribute.String("http.scheme", "https"))
+			} else {
+				attrs = append(attrs, attribute.String("http.scheme", "http"))
+			}
+			if len(ctx.Request.Host()) != 0 {
+				attrs = append(attrs, attribute.String("http.host", string(ctx.Request.Host())))
+			} else if ctx.Request.URI() != nil && len(ctx.Request.URI().Host()) != 0 {
+				attrs = append(attrs, attribute.String("http.host", string(ctx.Request.URI().Host())))
+			}
+			flavor := ""
+			if fastext.B2s(ctx.Request.Header.Protocol()) == "HTTP/2" {
+				flavor = "2"
+			} else {
+				flavor = "1.1"
+			}
+			attrs = append(attrs, attribute.String("http.flavor", flavor))
+
+			tmp := propagator.Extract(ctx, propagation.ConvertReq(&ctx.Request.Header))
+			tmp, span := tracer.Start(
 				ctx,
 				spanName,
 				oteltrace.WithSpanKind(oteltrace.SpanKindServer),
-				oteltrace.WithAttributes(semconv.HTTPServerAttributesFromHTTPRequest(
-					serviceName, spanName, r)...),
+				oteltrace.WithAttributes(attrs...),
 			)
 			defer span.End()
+			for _, key := range defaultTracerCtxKeys {
+				// there isn't any user-defined middleware before TraceHandler,
+				// so we can guarantee that the key will not be overwritten.
+				ctx.SetUserValue(key, tmp.Value(key))
+			}
+			defer func() {
+				for _, key := range defaultTracerCtxKeys {
+					ctx.RemoveUserValue(key)
+				}
+			}()
 
 			// convenient for tracking error messages
-			propagator.Inject(spanCtx, propagation.HeaderCarrier(w.Header()))
+			propagator.Inject(ctx, propagation.ConvertResp(&ctx.Response.Header))
 
-			trw := response.NewWithCodeResponseWriter(w)
-			next.ServeHTTP(trw, r.WithContext(spanCtx))
+			next(ctx)
 
-			span.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(trw.Code)...)
+			code := ctx.Response.StatusCode()
+			span.SetAttributes(semconv.HTTPAttributesFromHTTPStatusCode(code)...)
 			span.SetStatus(semconv.SpanStatusFromHTTPStatusCodeAndSpanKind(
-				trw.Code, oteltrace.SpanKindServer))
-		})
+				code, oteltrace.SpanKindServer))
+		}
 	}
 }
 

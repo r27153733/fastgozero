@@ -1,16 +1,13 @@
 package handler
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/base64"
 	"errors"
 	"io"
-	"net"
-	"net/http"
 
+	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/codec"
-	"github.com/zeromicro/go-zero/core/logx"
+	"github.com/zeromicro/go-zero/fastext"
 )
 
 const maxBytes = 1 << 20 // 1 MiB
@@ -18,50 +15,47 @@ const maxBytes = 1 << 20 // 1 MiB
 var errContentLengthExceeded = errors.New("content length exceeded")
 
 // CryptionHandler returns a middleware to handle cryption.
-func CryptionHandler(key []byte) func(http.Handler) http.Handler {
+func CryptionHandler(key []byte) func(fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return LimitCryptionHandler(maxBytes, key)
 }
 
 // LimitCryptionHandler returns a middleware to handle cryption.
-func LimitCryptionHandler(limitBytes int64, key []byte) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cw := newCryptionResponseWriter(w)
-			defer cw.flush(key)
-
-			if r.ContentLength <= 0 {
-				next.ServeHTTP(cw, r)
+func LimitCryptionHandler(limitBytes int64, key []byte) func(handler fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			if ctx.Request.Header.ContentLength() <= 0 {
+				next(ctx)
 				return
 			}
 
-			if err := decryptBody(limitBytes, key, r); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
+			if err := decryptBody(limitBytes, key, &ctx.Request); err != nil {
+				ctx.SetStatusCode(fasthttp.StatusBadRequest)
 				return
 			}
 
-			next.ServeHTTP(cw, r)
-		})
+			next(ctx)
+		}
 	}
 }
 
-func decryptBody(limitBytes int64, key []byte, r *http.Request) error {
-	if limitBytes > 0 && r.ContentLength > limitBytes {
+func decryptBody(limitBytes int64, key []byte, r *fasthttp.Request) error {
+	contentLength := r.Header.ContentLength()
+	if limitBytes > 0 && int64(contentLength) > limitBytes {
 		return errContentLengthExceeded
 	}
 
 	var content []byte
 	var err error
-	if r.ContentLength > 0 {
-		content = make([]byte, r.ContentLength)
-		_, err = io.ReadFull(r.Body, content)
+	if contentLength > 0 {
+		content = r.Body()
 	} else {
-		content, err = io.ReadAll(io.LimitReader(r.Body, maxBytes))
+		content, err = io.ReadAll(io.LimitReader(r.BodyStream(), maxBytes))
 	}
 	if err != nil {
 		return err
 	}
 
-	content, err = base64.StdEncoding.DecodeString(string(content))
+	content, err = base64.StdEncoding.DecodeString(fastext.B2s(content))
 	if err != nil {
 		return err
 	}
@@ -71,68 +65,7 @@ func decryptBody(limitBytes int64, key []byte, r *http.Request) error {
 		return err
 	}
 
-	var buf bytes.Buffer
-	buf.Write(output)
-	r.Body = io.NopCloser(&buf)
+	r.SetBody(output)
 
 	return nil
-}
-
-type cryptionResponseWriter struct {
-	http.ResponseWriter
-	buf *bytes.Buffer
-}
-
-func newCryptionResponseWriter(w http.ResponseWriter) *cryptionResponseWriter {
-	return &cryptionResponseWriter{
-		ResponseWriter: w,
-		buf:            new(bytes.Buffer),
-	}
-}
-
-func (w *cryptionResponseWriter) Flush() {
-	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
-		flusher.Flush()
-	}
-}
-
-func (w *cryptionResponseWriter) Header() http.Header {
-	return w.ResponseWriter.Header()
-}
-
-// Hijack implements the http.Hijacker interface.
-// This expands the Response to fulfill http.Hijacker if the underlying http.ResponseWriter supports it.
-func (w *cryptionResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if hijacked, ok := w.ResponseWriter.(http.Hijacker); ok {
-		return hijacked.Hijack()
-	}
-
-	return nil, nil, errors.New("server doesn't support hijacking")
-}
-
-func (w *cryptionResponseWriter) Write(p []byte) (int, error) {
-	return w.buf.Write(p)
-}
-
-func (w *cryptionResponseWriter) WriteHeader(statusCode int) {
-	w.ResponseWriter.WriteHeader(statusCode)
-}
-
-func (w *cryptionResponseWriter) flush(key []byte) {
-	if w.buf.Len() == 0 {
-		return
-	}
-
-	content, err := codec.EcbEncrypt(key, w.buf.Bytes())
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	body := base64.StdEncoding.EncodeToString(content)
-	if n, err := io.WriteString(w.ResponseWriter, body); err != nil {
-		logx.Errorf("write response failed, error: %s", err)
-	} else if n < len(body) {
-		logx.Errorf("actual bytes: %d, written bytes: %d", len(body), n)
-	}
 }

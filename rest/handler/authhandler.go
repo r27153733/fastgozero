@@ -1,14 +1,12 @@
 package handler
 
 import (
-	"context"
 	"errors"
-	"net/http"
-	"net/http/httputil"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/rest/internal/response"
+	"github.com/zeromicro/go-zero/fastext"
 	"github.com/zeromicro/go-zero/rest/token"
 )
 
@@ -36,50 +34,51 @@ type (
 	}
 
 	// UnauthorizedCallback defines the method of unauthorized callback.
-	UnauthorizedCallback func(w http.ResponseWriter, r *http.Request, err error)
+	UnauthorizedCallback func(ctx *fasthttp.RequestCtx, err error)
 	// AuthorizeOption defines the method to customize an AuthorizeOptions.
 	AuthorizeOption func(opts *AuthorizeOptions)
 )
 
 // Authorize returns an authorization middleware.
-func Authorize(secret string, opts ...AuthorizeOption) func(http.Handler) http.Handler {
+func Authorize(secret string, opts ...AuthorizeOption) func(fasthttp.RequestHandler) fasthttp.RequestHandler {
 	var authOpts AuthorizeOptions
 	for _, opt := range opts {
 		opt(&authOpts)
 	}
 
 	parser := token.NewTokenParser()
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			tok, err := parser.ParseToken(r, secret, authOpts.PrevSecret)
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			tok, err := parser.ParseToken(&ctx.Request, secret, authOpts.PrevSecret)
 			if err != nil {
-				unauthorized(w, r, err, authOpts.Callback)
+				unauthorized(ctx, err, authOpts.Callback)
 				return
 			}
 
 			if !tok.Valid {
-				unauthorized(w, r, errInvalidToken, authOpts.Callback)
+				unauthorized(ctx, errInvalidToken, authOpts.Callback)
 				return
 			}
 
 			claims, ok := tok.Claims.(jwt.MapClaims)
 			if !ok {
-				unauthorized(w, r, errNoClaims, authOpts.Callback)
+				unauthorized(ctx, errNoClaims, authOpts.Callback)
 				return
 			}
 
-			ctx := r.Context()
 			for k, v := range claims {
 				switch k {
 				case jwtAudience, jwtExpire, jwtId, jwtIssueAt, jwtIssuer, jwtNotBefore, jwtSubject:
 					// ignore the standard claims
 				default:
-					ctx = context.WithValue(ctx, k, v)
+					//ctx.SetUserValue(k, v)
+					free := fastext.SetUserValueCtx(ctx, k, v)
+					defer free()
 				}
 			}
 
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
+			next(ctx)
+		}
 	}
 }
 
@@ -97,26 +96,23 @@ func WithUnauthorizedCallback(callback UnauthorizedCallback) AuthorizeOption {
 	}
 }
 
-func detailAuthLog(r *http.Request, reason string) {
+func detailAuthLog(r *fasthttp.Request, reason string) {
 	// discard dump error, only for debug purpose
-	details, _ := httputil.DumpRequest(r, true)
-	logx.Errorf("authorize failed: %s\n=> %+v", reason, string(details))
+	logx.Errorf("authorize failed: %s\n=> %+v", reason, r.String())
 }
 
-func unauthorized(w http.ResponseWriter, r *http.Request, err error, callback UnauthorizedCallback) {
-	writer := response.NewHeaderOnceResponseWriter(w)
-
+func unauthorized(ctx *fasthttp.RequestCtx, err error, callback UnauthorizedCallback) {
 	if err != nil {
-		detailAuthLog(r, err.Error())
+		detailAuthLog(&ctx.Request, err.Error())
 	} else {
-		detailAuthLog(r, noDetailReason)
+		detailAuthLog(&ctx.Request, noDetailReason)
 	}
 
 	// let callback go first, to make sure we respond with user-defined HTTP header
 	if callback != nil {
-		callback(writer, r, err)
+		callback(ctx, err)
 	}
 
 	// if user not setting HTTP header, we set header with 401
-	writer.WriteHeader(http.StatusUnauthorized)
+	ctx.Response.SetStatusCode(fasthttp.StatusUnauthorized)
 }

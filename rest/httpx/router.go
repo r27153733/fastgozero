@@ -1,11 +1,13 @@
 package httpx
 
-import "net/http"
+import (
+	"github.com/valyala/fasthttp"
+)
 
 // Router interface represents a http router that handles http requests.
 type Router interface {
-	http.Handler
-	Handle(method, path string, handler http.Handler) error
-	SetNotFoundHandler(handler http.Handler)
-	SetNotAllowedHandler(handler http.Handler)
+	ServeHTTP(ctx *fasthttp.RequestCtx)
+	Handle(method, path string, handler fasthttp.RequestHandler) error
+	SetNotFoundHandler(handler fasthttp.RequestHandler)
+	SetNotAllowedHandler(handler fasthttp.RequestHandler)
 }

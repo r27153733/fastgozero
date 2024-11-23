@@ -2,25 +2,25 @@ package httpx
 
 import (
 	"errors"
-	"net/http"
+	"github.com/valyala/fasthttp"
+	"mime/multipart"
 )
 
 const xForwardedFor = "X-Forwarded-For"
 
 // GetFormValues returns the form values.
-func GetFormValues(r *http.Request) (map[string]any, error) {
-	if err := r.ParseForm(); err != nil {
-		return nil, err
-	}
-
-	if err := r.ParseMultipartForm(maxMemory); err != nil {
-		if !errors.Is(err, http.ErrNotMultipart) {
+func GetFormValues(r *fasthttp.Request) (res map[string]any, err error) {
+	var form *multipart.Form
+	if form, err = r.MultipartForm(); err != nil {
+		if !errors.Is(err, fasthttp.ErrNoMultipartForm) {
 			return nil, err
+		} else {
+			return make(map[string]any), nil
 		}
 	}
 
-	params := make(map[string]any, len(r.Form))
-	for name, values := range r.Form {
+	params := make(map[string]any, len(form.Value))
+	for name, values := range form.Value {
 		filtered := make([]string, 0, len(values))
 		for _, v := range values {
 			if len(v) > 0 {
@@ -37,11 +37,11 @@ func GetFormValues(r *http.Request) (map[string]any, error) {
 }
 
 // GetRemoteAddr returns the peer address, supports X-Forward-For.
-func GetRemoteAddr(r *http.Request) string {
-	v := r.Header.Get(xForwardedFor)
+func GetRemoteAddr(ctx *fasthttp.RequestCtx) string {
+	v := ctx.Request.Header.Peek(xForwardedFor)
 	if len(v) > 0 {
-		return v
+		return string(v)
 	}
 
-	return r.RemoteAddr
+	return ctx.RemoteAddr().String()
 }
