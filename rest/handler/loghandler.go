@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"bytes"
-	"fmt"
+	"bufio"
 	"strconv"
 	"time"
 
+	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/color"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -23,6 +23,11 @@ const (
 )
 
 var slowThreshold = syncx.ForAtomicDuration(defaultSlowThreshold)
+
+var (
+	logBriefBodyPool   bytebufferpool.Pool
+	logDetailsBodyPool bytebufferpool.Pool
+)
 
 // LogHandler returns a middleware that logs http request and response.
 func LogHandler(next fasthttp.RequestHandler) fasthttp.RequestHandler {
@@ -62,26 +67,46 @@ func isOkResponse(code int) bool {
 }
 
 func logBrief(r *fasthttp.RequestCtx, timer *utils.ElapsedTimer, logs *internal.LogCollector) {
-	var buf bytes.Buffer
 	code := r.Response.StatusCode()
 	duration := timer.Duration()
 	logger := logx.WithContext(r).WithDuration(duration)
-	buf.WriteString(fmt.Sprintf("[HTTP] %s - %s %s - %s - %s",
-		wrapStatusCode(code), wrapMethod(fastext.B2s(r.Method())), fastext.B2s(r.RequestURI()), httpx.GetRemoteAddr(r), fastext.B2s(r.UserAgent())))
-	if duration > slowThreshold.Load() {
-		logger.Slowf("[HTTP] %s - %s %s - %s - %s - slowcall(%s)",
-			wrapStatusCode(code), wrapMethod(fastext.B2s(r.Method())), fastext.B2s(r.RequestURI()), httpx.GetRemoteAddr(r), fastext.B2s(r.UserAgent()),
-			timex.ReprOfDuration(duration))
+	ok := isOkResponse(code)
+
+	var buf *bytebufferpool.ByteBuffer
+	if ok {
+		buf = logBriefBodyPool.Get()
+		defer logBriefBodyPool.Put(buf)
+	} else {
+		buf = new(bytebufferpool.ByteBuffer)
 	}
 
-	ok := isOkResponse(code)
+	buf.B = append(buf.B, "[HTTP] "...)
+	buf.B = append(buf.B, wrapStatusCode(code)...)
+	buf.B = append(buf.B, " - "...)
+	buf.B = append(buf.B, wrapMethod(fastext.B2s(r.Method()))...)
+	buf.B = append(buf.B, " "...)
+	buf.B = append(buf.B, r.RequestURI()...)
+	buf.B = append(buf.B, " - "...)
+	buf.B = append(buf.B, httpx.GetRemoteAddr(r)...)
+	buf.B = append(buf.B, " - "...)
+	buf.B = append(buf.B, r.UserAgent()...)
+
+	if duration > slowThreshold.Load() {
+		logger.Slowf("%s - slowcall(%s)", fastext.B2s(buf.B), timex.ReprOfDuration(duration))
+	}
+
 	if !ok {
-		buf.WriteString(fmt.Sprintf("\n%s", r.Request.String()))
+		buf.B = append(buf.B, '\n')
+		err := r.Request.Write(bufio.NewWriterSize(buf, 1))
+		if err != nil {
+			panic("BUG!" + err.Error())
+		}
 	}
 
 	body := logs.Flush()
 	if len(body) > 0 {
-		buf.WriteString(fmt.Sprintf("\n%s", body))
+		buf.B = append(buf.B, '\n')
+		buf.B = append(buf.B, body...)
 	}
 
 	if ok {
@@ -93,25 +118,55 @@ func logBrief(r *fasthttp.RequestCtx, timer *utils.ElapsedTimer, logs *internal.
 
 func logDetails(ctx *fasthttp.RequestCtx, timer *utils.ElapsedTimer,
 	logs *internal.LogCollector) {
-	var buf bytes.Buffer
+	buf := logDetailsBodyPool.Get()
+	defer logDetailsBodyPool.Put(buf)
+
 	duration := timer.Duration()
 	code := ctx.Response.StatusCode()
 	logger := logx.WithContext(ctx)
-	buf.WriteString(fmt.Sprintf("[HTTP] %s - %d - %s - %s\n=> %s\n",
-		fastext.B2s(ctx.Method()), code, ctx.RemoteAddr().String(), timex.ReprOfDuration(duration), ctx.Request.String()))
+
+	buf.B = append(buf.B, "[HTTP] "...)
+	buf.B = append(buf.B, ctx.Method()...)
+	buf.B = append(buf.B, " - "...)
+	buf.B = append(buf.B, wrapStatusCode(code)...)
+	buf.B = append(buf.B, " - "...)
+	buf.B = append(buf.B, ctx.RemoteAddr().String()...)
+	buf.B = append(buf.B, " - "...)
 	if duration > defaultSlowThreshold {
-		logger.Slowf("[HTTP] %s - %d - %s - slowcall(%s)\n=> %s\n", fastext.B2s(ctx.Method()), code, ctx.RemoteAddr().String(),
-			fmt.Sprintf("slowcall(%s)", timex.ReprOfDuration(duration)), ctx.Request.String())
+		l := len(buf.B)
+		timeStr := timex.ReprOfDuration(duration)
+
+		buf.B = append(buf.B, "slowcall("...)
+		buf.B = append(buf.B, timeStr...)
+		buf.B = append(buf.B, ')')
+		buf.B = append(buf.B, "\n=> "...)
+		buf.B = append(buf.B, ctx.Request.String()...)
+		buf.B = append(buf.B, '\n')
+
+		logger.Slow(fastext.B2s(buf.B))
+
+		buf.B = append(buf.B[:l], timeStr...)
+		l = l + 10 + len(timeStr)
+		buf.B = append(buf.B, buf.B[:l:l]...)
 	}
+	buf.B = append(buf.B, timex.ReprOfDuration(duration)...)
+	buf.B = append(buf.B, "\n=> "...)
+	_, err := ctx.Request.WriteTo(buf)
+	if err != nil {
+		panic("BUG!" + err.Error())
+	}
+	buf.B = append(buf.B, '\n')
 
 	body := logs.Flush()
 	if len(body) > 0 {
-		buf.WriteString(fmt.Sprintf("%s\n", body))
+		buf.B = append(buf.B, body...)
+		buf.B = append(buf.B, '\n')
 	}
 
-	respBuf := ctx.Response.String()
-	if len(respBuf) > 0 {
-		buf.WriteString(fmt.Sprintf("<= %s", respBuf))
+	buf.B = append(buf.B, "<= "...)
+	_, err = ctx.Response.WriteTo(buf)
+	if err != nil {
+		panic("BUG!" + err.Error())
 	}
 
 	if isOkResponse(code) {
