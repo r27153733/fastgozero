@@ -1,10 +1,11 @@
 package httpx
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/valyala/fasthttp"
 	"io"
 	"net/http"
 	"sync"
@@ -22,17 +23,17 @@ var (
 )
 
 // Error writes err into w.
-func Error(w http.ResponseWriter, err error, fns ...func(w http.ResponseWriter, err error)) {
+func Error(w *fasthttp.Response, err error, fns ...func(w *fasthttp.Response, err error)) {
 	doHandleError(w, err, buildErrorHandler(context.Background()), WriteJson, fns...)
 }
 
 // ErrorCtx writes err into w.
-func ErrorCtx(ctx context.Context, w http.ResponseWriter, err error,
-	fns ...func(w http.ResponseWriter, err error)) {
-	writeJson := func(w http.ResponseWriter, code int, v any) {
-		WriteJsonCtx(ctx, w, code, v)
+func ErrorCtx(ctx *fasthttp.RequestCtx, err error,
+	fns ...func(w *fasthttp.Response, err error)) {
+	writeJson := func(w *fasthttp.Response, code int, v any) {
+		WriteJsonCtx(ctx, code, v)
 	}
-	doHandleError(w, err, buildErrorHandler(ctx), writeJson, fns...)
+	doHandleError(&ctx.Response, err, buildErrorHandler(ctx), writeJson, fns...)
 }
 
 // Ok writes HTTP 200 OK into w.
@@ -41,7 +42,7 @@ func Ok(w http.ResponseWriter) {
 }
 
 // OkJson writes v into w with 200 OK.
-func OkJson(w http.ResponseWriter, v any) {
+func OkJson(w *fasthttp.Response, v any) {
 	okLock.RLock()
 	handler := okHandler
 	okLock.RUnlock()
@@ -52,14 +53,14 @@ func OkJson(w http.ResponseWriter, v any) {
 }
 
 // OkJsonCtx writes v into w with 200 OK.
-func OkJsonCtx(ctx context.Context, w http.ResponseWriter, v any) {
+func OkJsonCtx(ctx *fasthttp.RequestCtx, v any) {
 	okLock.RLock()
 	handlerCtx := okHandler
 	okLock.RUnlock()
 	if handlerCtx != nil {
 		v = handlerCtx(ctx, v)
 	}
-	WriteJsonCtx(ctx, w, http.StatusOK, v)
+	WriteJsonCtx(ctx, http.StatusOK, v)
 }
 
 // SetErrorHandler sets the error handler, which is called on calling Error.
@@ -92,33 +93,36 @@ func SetOkHandler(handler func(context.Context, any) any) {
 // Stream writes data into w with streaming mode.
 // The ctx is used to control the streaming loop, typically use r.Context().
 // The fn is called repeatedly until it returns false.
-func Stream(ctx context.Context, w http.ResponseWriter, fn func(w io.Writer) bool) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			hasMore := fn(w)
-			if flusher, ok := w.(http.Flusher); ok {
-				flusher.Flush()
-			}
-			if !hasMore {
+func Stream(ctx *fasthttp.RequestCtx, fn func(w io.Writer) bool) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	ctx.Response.SetBodyStreamWriter(func(w *bufio.Writer) {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
 				return
+			default:
+				hasMore := fn(w)
+				if !hasMore {
+					return
+				}
 			}
 		}
-	}
+	})
+	wg.Wait()
 }
 
 // WriteJson writes v as json string into w with code.
-func WriteJson(w http.ResponseWriter, code int, v any) {
+func WriteJson(w *fasthttp.Response, code int, v any) {
 	if err := doWriteJson(w, code, v); err != nil {
 		logx.Error(err)
 	}
 }
 
 // WriteJsonCtx writes v as json string into w with code.
-func WriteJsonCtx(ctx context.Context, w http.ResponseWriter, code int, v any) {
-	if err := doWriteJson(w, code, v); err != nil {
+func WriteJsonCtx(ctx *fasthttp.RequestCtx, code int, v any) {
+	if err := doWriteJson(&ctx.Response, code, v); err != nil {
 		logx.WithContext(ctx).Error(err)
 	}
 }
@@ -138,9 +142,9 @@ func buildErrorHandler(ctx context.Context) func(error) (int, any) {
 	return handler
 }
 
-func doHandleError(w http.ResponseWriter, err error, handler func(error) (int, any),
-	writeJson func(w http.ResponseWriter, code int, v any),
-	fns ...func(w http.ResponseWriter, err error)) {
+func doHandleError(w *fasthttp.Response, err error, handler func(error) (int, any),
+	writeJson func(w *fasthttp.Response, code int, v any),
+	fns ...func(w *fasthttp.Response, err error)) {
 	if handler == nil {
 		if len(fns) > 0 {
 			for _, fn := range fns {
@@ -149,9 +153,15 @@ func doHandleError(w http.ResponseWriter, err error, handler func(error) (int, a
 		} else if errcode.IsGrpcError(err) {
 			// don't unwrap error and get status.Message(),
 			// it hides the rpc error headers.
-			http.Error(w, err.Error(), errcode.CodeFromGrpcError(err))
+			w.Reset()
+			w.SetStatusCode(errcode.CodeFromGrpcError(err))
+			w.Header.SetContentTypeBytes([]byte("text/plain; charset=utf-8"))
+			w.SetBodyString(err.Error())
 		} else {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			w.Reset()
+			w.SetStatusCode(fasthttp.StatusBadRequest)
+			w.Header.SetContentTypeBytes([]byte("text/plain; charset=utf-8"))
+			w.SetBodyString(err.Error())
 		}
 
 		return
@@ -159,37 +169,34 @@ func doHandleError(w http.ResponseWriter, err error, handler func(error) (int, a
 
 	code, body := handler(err)
 	if body == nil {
-		w.WriteHeader(code)
+		w.SetStatusCode(code)
 		return
 	}
 
 	switch v := body.(type) {
 	case error:
-		http.Error(w, v.Error(), code)
+		w.Reset()
+		w.SetStatusCode(code)
+		w.Header.SetContentTypeBytes([]byte("text/plain; charset=utf-8"))
+		w.SetBodyString(v.Error())
 	default:
 		writeJson(w, code, body)
 	}
 }
 
-func doWriteJson(w http.ResponseWriter, code int, v any) error {
+func doWriteJson(w *fasthttp.Response, code int, v any) error {
 	bs, err := json.Marshal(v)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.Reset()
+		w.SetStatusCode(fasthttp.StatusInternalServerError)
+		w.Header.SetContentTypeBytes([]byte("text/plain; charset=utf-8"))
+		w.SetBodyString(err.Error())
 		return fmt.Errorf("marshal json failed, error: %w", err)
 	}
 
-	w.Header().Set(ContentType, header.JsonContentType)
-	w.WriteHeader(code)
-
-	if n, err := w.Write(bs); err != nil {
-		// http.ErrHandlerTimeout has been handled by http.TimeoutHandler,
-		// so it's ignored here.
-		if !errors.Is(err, http.ErrHandlerTimeout) {
-			return fmt.Errorf("write response failed, error: %w", err)
-		}
-	} else if n < len(bs) {
-		return fmt.Errorf("actual bytes: %d, written bytes: %d", len(bs), n)
-	}
-
+	w.Header.Set(ContentType, header.JsonContentType)
+	w.SetStatusCode(code)
+	w.AppendBody(bs)
+	w.Body()
 	return nil
 }
