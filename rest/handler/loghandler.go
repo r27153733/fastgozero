@@ -140,22 +140,26 @@ func logDetails(ctx *fasthttp.RequestCtx, timer *utils.ElapsedTimer,
 		buf.B = append(buf.B, timeStr...)
 		buf.B = append(buf.B, ')')
 		buf.B = append(buf.B, "\n=> "...)
-		buf.B = append(buf.B, ctx.Request.String()...)
+		_, err := ctx.Request.WriteTo(buf)
+		if err != nil {
+			panic("BUG!" + err.Error())
+		}
 		buf.B = append(buf.B, '\n')
 
 		logger.Slow(fastext.B2s(buf.B))
 
-		buf.B = append(buf.B[:l], timeStr...)
-		l = l + 10 + len(timeStr)
-		buf.B = append(buf.B, buf.B[:l:l]...)
+		copy(buf.B[l:], timeStr)
+		l = l + len(timeStr)
+		buf.B = append(buf.B[:l], buf.B[l+10:]...)
+	} else {
+		buf.B = append(buf.B, timex.ReprOfDuration(duration)...)
+		buf.B = append(buf.B, "\n=> "...)
+		_, err := ctx.Request.WriteTo(buf)
+		if err != nil {
+			panic("BUG!" + err.Error())
+		}
+		buf.B = append(buf.B, '\n')
 	}
-	buf.B = append(buf.B, timex.ReprOfDuration(duration)...)
-	buf.B = append(buf.B, "\n=> "...)
-	_, err := ctx.Request.WriteTo(buf)
-	if err != nil {
-		panic("BUG!" + err.Error())
-	}
-	buf.B = append(buf.B, '\n')
 
 	body := logs.Flush()
 	if len(body) > 0 {
@@ -164,10 +168,11 @@ func logDetails(ctx *fasthttp.RequestCtx, timer *utils.ElapsedTimer,
 	}
 
 	buf.B = append(buf.B, "<= "...)
-	_, err = ctx.Response.WriteTo(buf)
+	_, err := ctx.Response.WriteTo(buf)
 	if err != nil {
 		panic("BUG!" + err.Error())
 	}
+	buf.B = append(buf.B, '\n')
 
 	if isOkResponse(code) {
 		logger.Info(buf.String())
