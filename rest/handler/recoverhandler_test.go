@@ -1,30 +1,60 @@
 package handler
 
 import (
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWithPanic(t *testing.T) {
-	handler := RecoverHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RecoverHandler(func(ctx *fasthttp.RequestCtx) {
 		panic("whatever")
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusInternalServerError, resp.Code)
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode())
 }
 
 func TestWithoutPanic(t *testing.T) {
-	handler := RecoverHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	handler := RecoverHandler(func(ctx *fasthttp.RequestCtx) {
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
 }

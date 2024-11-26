@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,12 +14,27 @@ import (
 func TestMetricHandler(t *testing.T) {
 	metrics := stat.NewMetrics("unit-test")
 	metricHandler := MetricHandler(metrics)
-	handler := metricHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	handler := metricHandler(func(ctx *fasthttp.RequestCtx) {
+		ctx.SetStatusCode(http.StatusOK)
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
 }

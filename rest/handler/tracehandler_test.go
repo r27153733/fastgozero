@@ -2,9 +2,11 @@ package handler
 
 import (
 	"context"
-	"io"
-	"net/http"
-	"net/http/httptest"
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
+	"github.com/zeromicro/go-zero/fastext/otel/propagation"
+
+	"net"
 	"strconv"
 	"testing"
 
@@ -14,7 +16,7 @@ import (
 	"github.com/zeromicro/go-zero/rest/chain"
 	"go.opentelemetry.io/otel"
 	tcodes "go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/propagation"
+
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -31,25 +33,36 @@ func TestOtelHandler(t *testing.T) {
 	for _, test := range []string{"", "bar"} {
 		t.Run(test, func(t *testing.T) {
 			h := chain.New(TraceHandler("foo", test)).Then(
-				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					span := trace.SpanFromContext(r.Context())
+				func(ctx *fasthttp.RequestCtx) {
+					span := trace.SpanFromContext(ctx)
 					assert.True(t, span.SpanContext().IsValid())
 					assert.True(t, span.IsRecording())
-				}))
-			ts := httptest.NewServer(h)
-			defer ts.Close()
+				})
+			ln := fasthttputil.NewInmemoryListener()
+			s := fasthttp.Server{
+				Handler: h,
+			}
+			go s.Serve(ln) //nolint:errcheck
 
-			client := ts.Client()
+			c := &fasthttp.HostClient{
+				Dial: func(addr string) (net.Conn, error) {
+					return ln.Dial()
+				},
+			}
+
 			err := func(ctx context.Context) error {
 				ctx, span := otel.Tracer("httptrace/client").Start(ctx, "test")
 				defer span.End()
 
-				req, _ := http.NewRequest("GET", ts.URL, nil)
-				otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
-
-				res, err := client.Do(req)
+				req := fasthttp.AcquireRequest()
+				resp := fasthttp.AcquireResponse()
+				req.Header.SetMethod(fasthttp.MethodGet)
+				req.SetRequestURI("http://localhost")
+				otel.GetTextMapPropagator().Inject(ctx, propagation.ConvertReq(&req.Header))
+				err := c.Do(req, resp)
 				assert.Nil(t, err)
-				return res.Body.Close()
+				resp.Body()
+				return nil
 			}(context.Background())
 
 			assert.Nil(t, err)
@@ -60,17 +73,28 @@ func TestOtelHandler(t *testing.T) {
 func TestTraceHandler(t *testing.T) {
 	me := tracetest.NewInMemoryExporter(t)
 	h := chain.New(TraceHandler("foo", "/")).Then(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	ts := httptest.NewServer(h)
-	defer ts.Close()
+		func(ctx *fasthttp.RequestCtx) {})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: h,
+	}
+	go s.Serve(ln) //nolint:errcheck
 
-	client := ts.Client()
+	client := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
 	err := func(ctx context.Context) error {
-		req, _ := http.NewRequest("GET", ts.URL, nil)
-
-		res, err := client.Do(req)
+		req := fasthttp.AcquireRequest()
+		resp := fasthttp.AcquireResponse()
+		req.Header.SetMethod(fasthttp.MethodGet)
+		req.SetRequestURI("http://localhost")
+		otel.GetTextMapPropagator().Inject(ctx, propagation.ConvertReq(&req.Header))
+		err := client.Do(req, resp)
 		assert.Nil(t, err)
-		return res.Body.Close()
+		resp.Body()
+		return nil
 	}(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(me.GetSpans()))
@@ -79,7 +103,7 @@ func TestTraceHandler(t *testing.T) {
 		Code: tcodes.Unset,
 	}, span.Status())
 	assert.Equal(t, 0, len(span.Events()))
-	assert.Equal(t, 9, len(span.Attributes()))
+	assert.Equal(t, 10, len(span.Attributes())) // ip
 }
 
 func TestDontTracingSpan(t *testing.T) {
@@ -94,8 +118,8 @@ func TestDontTracingSpan(t *testing.T) {
 	for _, test := range []string{"", "bar", "foo"} {
 		t.Run(test, func(t *testing.T) {
 			h := chain.New(TraceHandler("foo", test, WithTraceIgnorePaths([]string{"bar"}))).Then(
-				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					span := trace.SpanFromContext(r.Context())
+				func(ctx *fasthttp.RequestCtx) {
+					span := trace.SpanFromContext(ctx)
 					spanCtx := span.SpanContext()
 					if test == "bar" {
 						assert.False(t, spanCtx.IsValid())
@@ -105,21 +129,31 @@ func TestDontTracingSpan(t *testing.T) {
 
 					assert.True(t, span.IsRecording())
 					assert.True(t, spanCtx.IsValid())
-				}))
-			ts := httptest.NewServer(h)
-			defer ts.Close()
+				})
+			ln := fasthttputil.NewInmemoryListener()
+			s := fasthttp.Server{
+				Handler: h,
+			}
+			go s.Serve(ln) //nolint:errcheck
 
-			client := ts.Client()
+			client := &fasthttp.HostClient{
+				Dial: func(addr string) (net.Conn, error) {
+					return ln.Dial()
+				},
+			}
 			err := func(ctx context.Context) error {
 				ctx, span := otel.Tracer("httptrace/client").Start(ctx, "test")
 				defer span.End()
 
-				req, _ := http.NewRequest("GET", ts.URL, nil)
-				otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
-
-				res, err := client.Do(req)
+				req := fasthttp.AcquireRequest()
+				resp := fasthttp.AcquireResponse()
+				req.Header.SetMethod(fasthttp.MethodGet)
+				req.SetRequestURI("http://localhost")
+				otel.GetTextMapPropagator().Inject(ctx, propagation.ConvertReq(&req.Header))
+				err := client.Do(req, resp)
 				assert.Nil(t, err)
-				return res.Body.Close()
+				resp.Body()
+				return nil
 			}(context.Background())
 
 			assert.Nil(t, err)
@@ -139,34 +173,42 @@ func TestTraceResponseWriter(t *testing.T) {
 	for _, test := range []int{0, 200, 300, 400, 401, 500, 503} {
 		t.Run(strconv.Itoa(test), func(t *testing.T) {
 			h := chain.New(TraceHandler("foo", "bar")).Then(
-				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					span := trace.SpanFromContext(r.Context())
+				func(ctx *fasthttp.RequestCtx) {
+					span := trace.SpanFromContext(ctx)
 					spanCtx := span.SpanContext()
 					assert.True(t, span.IsRecording())
 					assert.True(t, spanCtx.IsValid())
 					if test != 0 {
-						w.WriteHeader(test)
+						ctx.SetStatusCode(test)
 					}
-					w.Write([]byte("hello"))
-				}))
-			ts := httptest.NewServer(h)
-			defer ts.Close()
+					ctx.Response.AppendBody([]byte("hello"))
+				})
+			ln := fasthttputil.NewInmemoryListener()
+			s := fasthttp.Server{
+				Handler: h,
+			}
+			go s.Serve(ln) //nolint:errcheck
 
-			client := ts.Client()
+			client := &fasthttp.HostClient{
+				Dial: func(addr string) (net.Conn, error) {
+					return ln.Dial()
+				},
+			}
 			err := func(ctx context.Context) error {
 				ctx, span := otel.Tracer("httptrace/client").Start(ctx, "test")
 				defer span.End()
 
-				req, _ := http.NewRequest("GET", ts.URL, nil)
-				otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
-
-				res, err := client.Do(req)
+				req := fasthttp.AcquireRequest()
+				resp := fasthttp.AcquireResponse()
+				req.Header.SetMethod(fasthttp.MethodGet)
+				req.SetRequestURI("http://localhost")
+				otel.GetTextMapPropagator().Inject(ctx, propagation.ConvertReq(&req.Header))
+				err := client.Do(req, resp)
 				assert.Nil(t, err)
-				resBody := make([]byte, 5)
-				_, err = res.Body.Read(resBody)
-				assert.Equal(t, io.EOF, err)
+
+				resBody := resp.Body()
 				assert.Equal(t, []byte("hello"), resBody, "response body fail")
-				return res.Body.Close()
+				return nil
 			}(context.Background())
 
 			assert.Nil(t, err)

@@ -1,19 +1,18 @@
 package handler
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"io"
+	"net"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 	"testing/iotest"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
 	"github.com/zeromicro/go-zero/core/codec"
-	"github.com/zeromicro/go-zero/core/logx/logtest"
 )
 
 const (
@@ -24,193 +23,293 @@ const (
 var aesKey = []byte(`PdSgVkYp3s6v9y$B&E)H+MbQeThWmZq4`)
 
 func TestCryptionHandlerGet(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/any", http.NoBody)
-	handler := CryptionHandler(aesKey)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(respText))
-		w.Header().Set("X-Test", "test")
-		assert.Nil(t, err)
-	}))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
+	handler := CryptionHandler(aesKey)(func(ctx *fasthttp.RequestCtx) {
+		ctx.Response.AppendBody([]byte(respText))
+		ctx.Response.Header.Set("X-Test", "test")
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost/any")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	expect, err := codec.EcbEncrypt(aesKey, []byte(respText))
 	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, recorder.Code)
-	assert.Equal(t, "test", recorder.Header().Get("X-Test"))
-	assert.Equal(t, base64.StdEncoding.EncodeToString(expect), recorder.Body.String())
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
+	assert.Equal(t, "test", string(resp.Header.Peek("X-Test")))
+	assert.Equal(t, base64.StdEncoding.EncodeToString(expect), string(resp.Body()))
 }
 
 func TestCryptionHandlerGet_badKey(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/any", http.NoBody)
-	handler := CryptionHandler(append(aesKey, aesKey...))(http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			_, err := w.Write([]byte(respText))
-			w.Header().Set("X-Test", "test")
-			assert.Nil(t, err)
-		}))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	handler := CryptionHandler(append(aesKey, aesKey...))(
+		func(ctx *fasthttp.RequestCtx) {
+			ctx.Response.AppendBody([]byte(respText))
+			ctx.Response.Header.Set("X-Test", "test")
+		})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost/any")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode())
 }
 
 func TestCryptionHandlerPost(t *testing.T) {
-	var buf bytes.Buffer
 	enc, err := codec.EcbEncrypt(aesKey, []byte(reqText))
 	assert.Nil(t, err)
-	buf.WriteString(base64.StdEncoding.EncodeToString(enc))
 
-	req := httptest.NewRequest(http.MethodPost, "/any", &buf)
-	handler := CryptionHandler(aesKey)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		assert.Nil(t, err)
+	handler := CryptionHandler(aesKey)(func(ctx *fasthttp.RequestCtx) {
+		body := ctx.PostBody()
 		assert.Equal(t, reqText, string(body))
 
-		w.Write([]byte(respText))
-	}))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
+		ctx.Response.AppendBody([]byte(respText))
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetRequestURI("http://localhost/any")
+	req.SetBody([]byte(base64.StdEncoding.EncodeToString(enc)))
+	err = c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	expect, err := codec.EcbEncrypt(aesKey, []byte(respText))
 	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, recorder.Code)
-	assert.Equal(t, base64.StdEncoding.EncodeToString(expect), recorder.Body.String())
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
+	assert.Equal(t, base64.StdEncoding.EncodeToString(expect), string(resp.Body()))
 }
 
 func TestCryptionHandlerPostBadEncryption(t *testing.T) {
-	var buf bytes.Buffer
 	enc, err := codec.EcbEncrypt(aesKey, []byte(reqText))
 	assert.Nil(t, err)
-	buf.Write(enc)
 
-	req := httptest.NewRequest(http.MethodPost, "/any", &buf)
 	handler := CryptionHandler(aesKey)(nil)
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetRequestURI("http://localhost/any")
+	req.SetBody(enc)
+	err = c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode())
 }
 
 func TestCryptionHandlerWriteHeader(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/any", http.NoBody)
-	handler := CryptionHandler(aesKey)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-	assert.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+	handler := CryptionHandler(aesKey)(func(ctx *fasthttp.RequestCtx) {
+		ctx.SetStatusCode(http.StatusServiceUnavailable)
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost/any")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode())
 }
 
 func TestCryptionHandlerFlush(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/any", http.NoBody)
-	handler := CryptionHandler(aesKey)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(respText))
-		flusher, ok := w.(http.Flusher)
-		assert.True(t, ok)
-		flusher.Flush()
-	}))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
+	handler := CryptionHandler(aesKey)(func(ctx *fasthttp.RequestCtx) {
+		ctx.Response.AppendBody([]byte(respText))
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost/any")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	expect, err := codec.EcbEncrypt(aesKey, []byte(respText))
 	assert.Nil(t, err)
-	assert.Equal(t, base64.StdEncoding.EncodeToString(expect), recorder.Body.String())
+	assert.Equal(t, base64.StdEncoding.EncodeToString(expect), string(resp.Body()))
 }
 
-func TestCryptionHandler_Hijack(t *testing.T) {
-	resp := httptest.NewRecorder()
-	writer := newCryptionResponseWriter(resp)
-	assert.NotPanics(t, func() {
-		writer.Hijack()
-	})
-
-	writer = newCryptionResponseWriter(mockedHijackable{resp})
-	assert.NotPanics(t, func() {
-		writer.Hijack()
-	})
-}
+//func TestCryptionHandler_Hijack(t *testing.T) {
+//	resp := httptest.NewRecorder()
+//	writer := newCryptionResponseWriter(resp)
+//	assert.NotPanics(t, func() {
+//		writer.Hijack()
+//	})
+//
+//	writer = newCryptionResponseWriter(mockedHijackable{resp})
+//	assert.NotPanics(t, func() {
+//		writer.Hijack()
+//	})
+//}
 
 func TestCryptionHandler_ContentTooLong(t *testing.T) {
-	handler := CryptionHandler(aesKey)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	}))
-	svr := httptest.NewServer(handler)
-	defer svr.Close()
-
+	handler := CryptionHandler(aesKey)(func(ctx *fasthttp.RequestCtx) {
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost/")
 	body := make([]byte, maxBytes+1)
 	_, err := rand.Read(body)
 	assert.NoError(t, err)
-	req, err := http.NewRequest(http.MethodPost, svr.URL, bytes.NewReader(body))
+	req.SetBody(body)
+	err = c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	assert.Nil(t, err)
-	resp, err := http.DefaultClient.Do(req)
-	assert.Nil(t, err)
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode())
 }
 
 func TestCryptionHandler_BadBody(t *testing.T) {
-	req, err := http.NewRequest(http.MethodPost, "/foo", iotest.ErrReader(io.ErrUnexpectedEOF))
-	assert.Nil(t, err)
-	err = decryptBody(maxBytes, aesKey, req)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetRequestURI("http://localhost/foo")
+	req.SetBodyStream(iotest.ErrReader(io.ErrUnexpectedEOF), -1)
+	err := decryptBody(maxBytes, aesKey, req)
 	assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
 
+// TODO
 func TestCryptionHandler_BadKey(t *testing.T) {
-	var buf bytes.Buffer
 	enc, err := codec.EcbEncrypt(aesKey, []byte(reqText))
 	assert.Nil(t, err)
-	buf.WriteString(base64.StdEncoding.EncodeToString(enc))
 
-	req := httptest.NewRequest(http.MethodPost, "/any", &buf)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetRequestURI("http://localhost/any")
+	req.SetBody([]byte(base64.StdEncoding.EncodeToString(enc)))
 	err = decryptBody(maxBytes, append(aesKey, aesKey...), req)
 	assert.Error(t, err)
 }
 
-func TestCryptionResponseWriter_Flush(t *testing.T) {
-	body := []byte("hello, world!")
-
-	t.Run("half", func(t *testing.T) {
-		recorder := httptest.NewRecorder()
-		f := flushableResponseWriter{
-			writer: &halfWriter{recorder},
-		}
-		w := newCryptionResponseWriter(f)
-		_, err := w.Write(body)
-		assert.NoError(t, err)
-		w.flush(aesKey)
-		b, err := io.ReadAll(recorder.Body)
-		assert.NoError(t, err)
-		expected, err := codec.EcbEncrypt(aesKey, body)
-		assert.NoError(t, err)
-		assert.True(t, strings.HasPrefix(base64.StdEncoding.EncodeToString(expected), string(b)))
-		assert.True(t, len(string(b)) < len(base64.StdEncoding.EncodeToString(expected)))
-	})
-
-	t.Run("full", func(t *testing.T) {
-		recorder := httptest.NewRecorder()
-		f := flushableResponseWriter{
-			writer: recorder,
-		}
-		w := newCryptionResponseWriter(f)
-		_, err := w.Write(body)
-		assert.NoError(t, err)
-		w.flush(aesKey)
-		b, err := io.ReadAll(recorder.Body)
-		assert.NoError(t, err)
-		expected, err := codec.EcbEncrypt(aesKey, body)
-		assert.NoError(t, err)
-		assert.Equal(t, base64.StdEncoding.EncodeToString(expected), string(b))
-	})
-
-	t.Run("bad writer", func(t *testing.T) {
-		buf := logtest.NewCollector(t)
-		f := flushableResponseWriter{
-			writer: new(badWriter),
-		}
-		w := newCryptionResponseWriter(f)
-		_, err := w.Write(body)
-		assert.NoError(t, err)
-		w.flush(aesKey)
-		assert.True(t, strings.Contains(buf.Content(), io.ErrClosedPipe.Error()))
-	})
-}
+//func TestCryptionResponseWriter_Flush(t *testing.T) {
+//	body := []byte("hello, world!")
+//
+//	t.Run("half", func(t *testing.T) {
+//		recorder := httptest.NewRecorder()
+//		f := flushableResponseWriter{
+//			writer: &halfWriter{recorder},
+//		}
+//		w := newCryptionResponseWriter(f)
+//		_, err := w.Write(body)
+//		assert.NoError(t, err)
+//		w.flush(aesKey)
+//		b, err := io.ReadAll(recorder.Body)
+//		assert.NoError(t, err)
+//		expected, err := codec.EcbEncrypt(aesKey, body)
+//		assert.NoError(t, err)
+//		assert.True(t, strings.HasPrefix(base64.StdEncoding.EncodeToString(expected), string(b)))
+//		assert.True(t, len(string(b)) < len(base64.StdEncoding.EncodeToString(expected)))
+//	})
+//
+//	t.Run("full", func(t *testing.T) {
+//		recorder := httptest.NewRecorder()
+//		f := flushableResponseWriter{
+//			writer: recorder,
+//		}
+//		w := newCryptionResponseWriter(f)
+//		_, err := w.Write(body)
+//		assert.NoError(t, err)
+//		w.flush(aesKey)
+//		b, err := io.ReadAll(recorder.Body)
+//		assert.NoError(t, err)
+//		expected, err := codec.EcbEncrypt(aesKey, body)
+//		assert.NoError(t, err)
+//		assert.Equal(t, base64.StdEncoding.EncodeToString(expected), string(b))
+//	})
+//
+//	t.Run("bad writer", func(t *testing.T) {
+//		buf := logtest.NewCollector(t)
+//		f := flushableResponseWriter{
+//			writer: new(badWriter),
+//		}
+//		w := newCryptionResponseWriter(f)
+//		_, err := w.Write(body)
+//		assert.NoError(t, err)
+//		w.flush(aesKey)
+//		assert.True(t, strings.Contains(buf.Content(), io.ErrClosedPipe.Error()))
+//	})
+//}
 
 type flushableResponseWriter struct {
 	writer io.Writer

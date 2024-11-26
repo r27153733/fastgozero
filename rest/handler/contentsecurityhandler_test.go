@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"os"
 	"strconv"
@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
 	"github.com/zeromicro/go-zero/core/codec"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
@@ -77,50 +79,50 @@ func TestContentSecurityHandler(t *testing.T) {
 		statusCode  int
 	}{
 		{
-			method: http.MethodGet,
+			method: fasthttp.MethodGet,
 			url:    "http://localhost/a/b?c=d&e=f",
 			strict: true,
 			crypt:  false,
 		},
 		{
-			method: http.MethodPost,
+			method: fasthttp.MethodPost,
 			url:    "http://localhost/a/b?c=d&e=f",
 			body:   "hello",
 			strict: true,
 			crypt:  false,
 		},
 		{
-			method: http.MethodGet,
+			method: fasthttp.MethodGet,
 			url:    "http://localhost/a/b?c=d&e=f",
 			strict: true,
 			crypt:  true,
 		},
 		{
-			method: http.MethodPost,
+			method: fasthttp.MethodPost,
 			url:    "http://localhost/a/b?c=d&e=f",
 			body:   "hello",
 			strict: true,
 			crypt:  true,
 		},
 		{
-			method:     http.MethodGet,
+			method:     fasthttp.MethodGet,
 			url:        "http://localhost/a/b?c=d&e=f",
 			strict:     true,
 			crypt:      true,
 			timestamp:  time.Now().Add(timeDiff).Unix(),
-			statusCode: http.StatusForbidden,
+			statusCode: fasthttp.StatusForbidden,
 		},
 		{
-			method:     http.MethodPost,
+			method:     fasthttp.MethodPost,
 			url:        "http://localhost/a/b?c=d&e=f",
 			body:       "hello",
 			strict:     true,
 			crypt:      true,
 			timestamp:  time.Now().Add(-timeDiff).Unix(),
-			statusCode: http.StatusForbidden,
+			statusCode: fasthttp.StatusForbidden,
 		},
 		{
-			method:     http.MethodPost,
+			method:     fasthttp.MethodPost,
 			url:        "http://remotehost/",
 			body:       "hello",
 			strict:     true,
@@ -128,7 +130,7 @@ func TestContentSecurityHandler(t *testing.T) {
 			requestUri: "http://localhost/a/b?c=d&e=f",
 		},
 		{
-			method:      http.MethodPost,
+			method:      fasthttp.MethodPost,
 			url:         "http://localhost/a/b?c=d&e=f",
 			body:        "hello",
 			strict:      false,
@@ -136,44 +138,44 @@ func TestContentSecurityHandler(t *testing.T) {
 			fingerprint: "badone",
 		},
 		{
-			method:      http.MethodPost,
+			method:      fasthttp.MethodPost,
 			url:         "http://localhost/a/b?c=d&e=f",
 			body:        "hello",
 			strict:      true,
 			crypt:       true,
 			timestamp:   time.Now().Add(-timeDiff).Unix(),
 			fingerprint: "badone",
-			statusCode:  http.StatusForbidden,
+			statusCode:  fasthttp.StatusForbidden,
 		},
 		{
-			method:     http.MethodPost,
+			method:     fasthttp.MethodPost,
 			url:        "http://localhost/a/b?c=d&e=f",
 			body:       "hello",
 			strict:     true,
 			crypt:      true,
 			missHeader: true,
-			statusCode: http.StatusForbidden,
+			statusCode: fasthttp.StatusForbidden,
 		},
 		{
-			method: http.MethodHead,
+			method: fasthttp.MethodHead,
 			url:    "http://localhost/a/b?c=d&e=f",
 			strict: true,
 			crypt:  false,
 		},
 		{
-			method:     http.MethodGet,
+			method:     fasthttp.MethodGet,
 			url:        "http://localhost/a/b?c=d&e=f",
 			strict:     true,
 			crypt:      false,
 			signature:  "badone",
-			statusCode: http.StatusForbidden,
+			statusCode: fasthttp.StatusForbidden,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.url, func(t *testing.T) {
 			if test.statusCode == 0 {
-				test.statusCode = http.StatusOK
+				test.statusCode = fasthttp.StatusOK
 			}
 			if len(test.fingerprint) == 0 {
 				test.fingerprint = fingerprint
@@ -192,9 +194,18 @@ func TestContentSecurityHandler(t *testing.T) {
 				contentSecurityHandler := ContentSecurityHandler(map[string]codec.RsaDecrypter{
 					fingerprint: decrypter,
 				}, time.Hour, test.strict)
-				handler := contentSecurityHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				}))
-
+				handler := contentSecurityHandler(func(ctx *fasthttp.RequestCtx) {
+				})
+				ln := fasthttputil.NewInmemoryListener()
+				s := fasthttp.Server{
+					Handler: handler,
+				}
+				go s.Serve(ln) //nolint:errcheck
+				c := &fasthttp.HostClient{
+					Dial: func(addr string) (net.Conn, error) {
+						return ln.Dial()
+					},
+				}
 				var reader io.Reader
 				if len(test.body) > 0 {
 					reader = strings.NewReader(test.body)
@@ -213,9 +224,12 @@ func TestContentSecurityHandler(t *testing.T) {
 				}
 				req, err := buildRequest(setting)
 				assert.Nil(t, err)
-				resp := httptest.NewRecorder()
-				handler.ServeHTTP(resp, req)
-				assert.Equal(t, test.statusCode, resp.Code)
+				resp := fasthttp.AcquireResponse()
+				err = c.Do(req, resp)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, test.statusCode, resp.StatusCode())
 			}()
 		})
 	}
@@ -234,21 +248,33 @@ func TestContentSecurityHandler_UnsignedCallback(t *testing.T) {
 		},
 		time.Hour,
 		true,
-		func(w http.ResponseWriter, r *http.Request, next http.Handler, strict bool, code int) {
-			w.WriteHeader(http.StatusOK)
+		func(ctx *fasthttp.RequestCtx, next fasthttp.RequestHandler, strict bool, code int) {
+			ctx.SetStatusCode(http.StatusOK)
 		})
-	handler := contentSecurityHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-
+	handler := contentSecurityHandler(func(ctx *fasthttp.RequestCtx) {})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
 	setting := requestSettings{
-		method:    http.MethodGet,
+		method:    fasthttp.MethodGet,
 		url:       "http://localhost/a/b?c=d&e=f",
 		signature: "badone",
 	}
 	req, err := buildRequest(setting)
 	assert.Nil(t, err)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	resp := fasthttp.AcquireResponse()
+	err = c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, fasthttp.StatusOK, resp.StatusCode())
 }
 
 func TestContentSecurityHandler_UnsignedCallback_WrongTime(t *testing.T) {
@@ -264,15 +290,25 @@ func TestContentSecurityHandler_UnsignedCallback_WrongTime(t *testing.T) {
 		},
 		time.Hour,
 		true,
-		func(w http.ResponseWriter, r *http.Request, next http.Handler, strict bool, code int) {
+		func(ctx *fasthttp.RequestCtx, next fasthttp.RequestHandler, strict bool, code int) {
 			assert.Equal(t, httpx.CodeSignatureWrongTime, code)
-			w.WriteHeader(http.StatusOK)
+			ctx.SetStatusCode(http.StatusOK)
 		})
-	handler := contentSecurityHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	handler := contentSecurityHandler(func(ctx *fasthttp.RequestCtx) {})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
 
 	reader := strings.NewReader("hello")
 	setting := requestSettings{
-		method:      http.MethodPost,
+		method:      fasthttp.MethodPost,
 		url:         "http://localhost/a/b?c=d&e=f",
 		body:        reader,
 		strict:      true,
@@ -282,12 +318,15 @@ func TestContentSecurityHandler_UnsignedCallback_WrongTime(t *testing.T) {
 	}
 	req, err := buildRequest(setting)
 	assert.Nil(t, err)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	resp := fasthttp.AcquireResponse()
+	err = c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, fasthttp.StatusOK, resp.StatusCode())
 }
 
-func buildRequest(rs requestSettings) (*http.Request, error) {
+func buildRequest(rs requestSettings) (*fasthttp.Request, error) {
 	var bodyStr string
 	var err error
 
@@ -300,8 +339,10 @@ func buildRequest(rs requestSettings) (*http.Request, error) {
 		}
 		bodyStr = base64.StdEncoding.EncodeToString(bodyBytes)
 	}
-
-	r := httptest.NewRequest(rs.method, rs.url, strings.NewReader(bodyStr))
+	r := fasthttp.AcquireRequest()
+	r.Header.SetMethod(rs.method)
+	r.SetRequestURI(rs.url)
+	r.SetBodyString(bodyStr)
 	if len(rs.signature) == 0 {
 		sha := sha256.New()
 		sha.Write([]byte(bodyStr))
@@ -317,8 +358,8 @@ func buildRequest(rs requestSettings) (*http.Request, error) {
 			path = u.Path
 			query = u.RawQuery
 		} else {
-			path = r.URL.Path
-			query = r.URL.RawQuery
+			path = string(r.URI().Path())
+			query = string(r.URI().QueryString())
 		}
 		contentOfSign := strings.Join([]string{
 			strconv.FormatInt(rs.timestamp, 10),

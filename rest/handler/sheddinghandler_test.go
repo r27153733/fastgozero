@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,19 +18,33 @@ func TestSheddingHandlerAccept(t *testing.T) {
 		allow: true,
 	}
 	sheddingHandler := SheddingHandler(shedder, metrics)
-	handler := sheddingHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Test", "test")
-		_, err := w.Write([]byte("content"))
-		assert.Nil(t, err)
-	}))
+	handler := sheddingHandler(func(ctx *fasthttp.RequestCtx) {
+		ctx.Response.Header.Set("X-Test", "test")
+		ctx.Response.AppendBody([]byte("content"))
+	})
 
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
 	req.Header.Set("X-Test", "test")
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, "test", resp.Header().Get("X-Test"))
-	assert.Equal(t, "content", resp.Body.String())
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
+	assert.Equal(t, "test", string(resp.Header.Peek("X-Test")))
+	assert.Equal(t, "content", string(resp.Body()))
 }
 
 func TestSheddingHandlerFail(t *testing.T) {
@@ -37,14 +53,29 @@ func TestSheddingHandlerFail(t *testing.T) {
 		allow: true,
 	}
 	sheddingHandler := SheddingHandler(shedder, metrics)
-	handler := sheddingHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}))
+	handler := sheddingHandler(func(ctx *fasthttp.RequestCtx) {
+		ctx.SetStatusCode(http.StatusServiceUnavailable)
+	})
 
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusServiceUnavailable, resp.Code)
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode())
 }
 
 func TestSheddingHandlerReject(t *testing.T) {
@@ -53,27 +84,56 @@ func TestSheddingHandlerReject(t *testing.T) {
 		allow: false,
 	}
 	sheddingHandler := SheddingHandler(shedder, metrics)
-	handler := sheddingHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusServiceUnavailable, resp.Code)
+	handler := sheddingHandler(func(ctx *fasthttp.RequestCtx) {
+		ctx.SetStatusCode(http.StatusOK)
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode())
 }
 
 func TestSheddingHandlerNoShedding(t *testing.T) {
 	metrics := stat.NewMetrics("unit-test")
 	sheddingHandler := SheddingHandler(nil, metrics)
-	handler := sheddingHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	handler := sheddingHandler(func(ctx *fasthttp.RequestCtx) {
+		ctx.SetStatusCode(http.StatusOK)
+	})
 
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
 }
 
 type mockShedder struct {

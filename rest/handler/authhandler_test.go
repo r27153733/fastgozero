@@ -3,58 +3,81 @@ package handler
 import (
 	"bufio"
 	"net"
-	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
 )
 
 func TestAuthHandlerFailed(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
 	handler := Authorize("B63F477D-BBA3-4E52-96D3-C0034C27694A", WithUnauthorizedCallback(
-		func(w http.ResponseWriter, r *http.Request, err error) {
+		func(ctx *fasthttp.RequestCtx, err error) {
 			assert.NotNil(t, err)
-			w.Header().Set("X-Test", err.Error())
-			w.WriteHeader(http.StatusUnauthorized)
-			_, err = w.Write([]byte("content"))
-			assert.Nil(t, err)
+			ctx.Response.Header.Set("X-Test", err.Error())
+			ctx.Response.SetStatusCode(fasthttp.StatusUnauthorized)
+			ctx.Response.AppendBody([]byte("content"))
 		}))(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}))
-
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusUnauthorized, resp.Code)
+		func(ctx *fasthttp.RequestCtx) {
+			ctx.Response.SetStatusCode(fasthttp.StatusOK)
+		})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://example.com")
+	resp := fasthttp.AcquireResponse()
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, fasthttp.StatusUnauthorized, resp.StatusCode())
 }
 
 func TestAuthHandler(t *testing.T) {
 	const key = "B63F477D-BBA3-4E52-96D3-C0034C27694A"
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
+	handler := Authorize(key)(
+		func(ctx *fasthttp.RequestCtx) {
+			ctx.Response.Header.Set("X-Test", "test")
+			ctx.Response.AppendBody([]byte("content"))
+		})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
 	token, err := buildToken(key, map[string]any{
 		"key": "value",
 	}, 3600)
 	assert.Nil(t, err)
 	req.Header.Set("Authorization", "Bearer "+token)
-	handler := Authorize(key)(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Test", "test")
-			_, err := w.Write([]byte("content"))
-			assert.Nil(t, err)
-
-			flusher, ok := w.(http.Flusher)
-			assert.True(t, ok)
-			flusher.Flush()
-		}))
-
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, "test", resp.Header().Get("X-Test"))
-	assert.Equal(t, "content", resp.Body.String())
+	err = c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, fasthttp.StatusOK, resp.StatusCode())
+	assert.Equal(t, "test", string(resp.Header.Peek("X-Test")))
+	assert.Equal(t, "content", string(resp.Body()))
 }
 
 func TestAuthHandlerWithPrevSecret(t *testing.T) {
@@ -62,31 +85,45 @@ func TestAuthHandlerWithPrevSecret(t *testing.T) {
 		key     = "14F17379-EB8F-411B-8F12-6929002DCA76"
 		prevKey = "B63F477D-BBA3-4E52-96D3-C0034C27694A"
 	)
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
+	handler := Authorize(key, WithPrevSecret(prevKey))(
+		func(ctx *fasthttp.RequestCtx) {
+			ctx.Response.Header.Set("X-Test", "test")
+			ctx.Response.AppendBody([]byte("content"))
+		})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
 	token, err := buildToken(key, map[string]any{
 		"key": "value",
 	}, 3600)
 	assert.Nil(t, err)
 	req.Header.Set("Authorization", "Bearer "+token)
-	handler := Authorize(key, WithPrevSecret(prevKey))(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("X-Test", "test")
-			_, err := w.Write([]byte("content"))
-			assert.Nil(t, err)
-		}))
-
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, "test", resp.Header().Get("X-Test"))
-	assert.Equal(t, "content", resp.Body.String())
+	err = c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, fasthttp.StatusOK, resp.StatusCode())
+	assert.Equal(t, "test", string(resp.Header.Peek("X-Test")))
+	assert.Equal(t, "content", string(resp.Body()))
 }
 
 func TestAuthHandler_NilError(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	resp := httptest.NewRecorder()
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+	ctx.Request.SetRequestURI("http://localhost")
 	assert.NotPanics(t, func() {
-		unauthorized(resp, req, nil, nil)
+		unauthorized(ctx, nil, nil)
 	})
 }
 

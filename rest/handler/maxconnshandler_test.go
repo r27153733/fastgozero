@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"sync"
 	"testing"
 
@@ -19,23 +21,49 @@ func TestMaxConnsHandler(t *testing.T) {
 	defer close(done)
 
 	maxConns := MaxConnsHandler(conns)
-	handler := maxConns(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := maxConns(func(ctx *fasthttp.RequestCtx) {
 		waitGroup.Done()
 		<-done
-	}))
-
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
 	for i := 0; i < conns; i++ {
 		go func() {
-			req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-			handler.ServeHTTP(httptest.NewRecorder(), req)
+			c := &fasthttp.HostClient{
+				Dial: func(addr string) (net.Conn, error) {
+					return ln.Dial()
+				},
+			}
+			req := fasthttp.AcquireRequest()
+			resp := fasthttp.AcquireResponse()
+			req.Header.SetMethod(fasthttp.MethodGet)
+			req.SetRequestURI("http://localhost")
+			err := c.Do(req, resp)
+			if err != nil {
+				t.Error(err)
+				return
+			}
 		}()
 	}
 
 	waitGroup.Wait()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusServiceUnavailable, resp.Code)
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode())
 }
 
 func TestWithoutMaxConnsHandler(t *testing.T) {
@@ -49,25 +77,53 @@ func TestWithoutMaxConnsHandler(t *testing.T) {
 	defer close(done)
 
 	maxConns := MaxConnsHandler(0)
-	handler := maxConns(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		val := r.Header.Get(key)
-		if val == value {
+	handler := maxConns(func(ctx *fasthttp.RequestCtx) {
+		val := ctx.Request.Header.Peek(key)
+		if string(val) == value {
 			waitGroup.Done()
 			<-done
 		}
-	}))
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
 
 	for i := 0; i < conns; i++ {
 		go func() {
-			req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
+			c := &fasthttp.HostClient{
+				Dial: func(addr string) (net.Conn, error) {
+					return ln.Dial()
+				},
+			}
+			req := fasthttp.AcquireRequest()
+			resp := fasthttp.AcquireResponse()
+			req.Header.SetMethod(fasthttp.MethodGet)
+			req.SetRequestURI("http://localhost")
 			req.Header.Set(key, value)
-			handler.ServeHTTP(httptest.NewRecorder(), req)
+			err := c.Do(req, resp)
+			if err != nil {
+				t.Error(err)
+				return
+			}
 		}()
 	}
 
 	waitGroup.Wait()
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
 }

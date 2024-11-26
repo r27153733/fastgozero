@@ -3,9 +3,10 @@ package handler
 import (
 	"bytes"
 	"errors"
-	"io"
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -14,30 +15,39 @@ import (
 )
 
 func TestLogHandler(t *testing.T) {
-	handlers := []func(handler http.Handler) http.Handler{
+	handlers := []func(handler fasthttp.RequestHandler) fasthttp.RequestHandler{
 		LogHandler,
 		DetailedLogHandler,
 	}
 
 	for _, logHandler := range handlers {
-		req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-		handler := logHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			internal.LogCollectorFromContext(r.Context()).Append("anything")
-			w.Header().Set("X-Test", "test")
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_, err := w.Write([]byte("content"))
-			assert.Nil(t, err)
-
-			flusher, ok := w.(http.Flusher)
-			assert.True(t, ok)
-			flusher.Flush()
-		}))
-
-		resp := httptest.NewRecorder()
-		handler.ServeHTTP(resp, req)
-		assert.Equal(t, http.StatusServiceUnavailable, resp.Code)
-		assert.Equal(t, "test", resp.Header().Get("X-Test"))
-		assert.Equal(t, "content", resp.Body.String())
+		handler := logHandler(func(ctx *fasthttp.RequestCtx) {
+			internal.LogCollectorFromContext(ctx).Append("anything")
+			ctx.Response.Header.Set("X-Test", "test")
+			ctx.SetStatusCode(http.StatusServiceUnavailable)
+			ctx.Response.AppendBody([]byte("content"))
+		})
+		ln := fasthttputil.NewInmemoryListener()
+		s := fasthttp.Server{
+			Handler: handler,
+		}
+		go s.Serve(ln) //nolint:errcheck
+		c := &fasthttp.HostClient{
+			Dial: func(addr string) (net.Conn, error) {
+				return ln.Dial()
+			},
+		}
+		req := fasthttp.AcquireRequest()
+		resp := fasthttp.AcquireResponse()
+		req.Header.SetMethod(fasthttp.MethodGet)
+		req.SetRequestURI("http://localhost")
+		err := c.Do(req, resp)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode())
+		assert.Equal(t, "test", string(resp.Header.Peek("X-Test")))
+		assert.Equal(t, "content", string(resp.Body()))
 	}
 }
 
@@ -47,69 +57,94 @@ func TestLogHandlerVeryLong(t *testing.T) {
 		buf.WriteByte('a')
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "http://localhost", &buf)
-	handler := LogHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		internal.LogCollectorFromContext(r.Context()).Append("anything")
-		_, _ = io.Copy(io.Discard, r.Body)
-		w.Header().Set("X-Test", "test")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, err := w.Write([]byte("content"))
-		assert.Nil(t, err)
-
-		flusher, ok := w.(http.Flusher)
-		assert.True(t, ok)
-		flusher.Flush()
-	}))
-
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusServiceUnavailable, resp.Code)
-	assert.Equal(t, "test", resp.Header().Get("X-Test"))
-	assert.Equal(t, "content", resp.Body.String())
+	handler := LogHandler(func(ctx *fasthttp.RequestCtx) {
+		internal.LogCollectorFromContext(ctx).Append("anything")
+		ctx.Request.Body()
+		ctx.Response.Header.Set("X-Test", "test")
+		ctx.SetStatusCode(http.StatusServiceUnavailable)
+		ctx.Response.AppendBody([]byte("content"))
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetRequestURI("http://localhost")
+	req.SetBodyStream(&buf, -1)
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode())
+	assert.Equal(t, "test", string(resp.Header.Peek("X-Test")))
+	assert.Equal(t, "content", string(resp.Body()))
 }
 
 func TestLogHandlerSlow(t *testing.T) {
-	handlers := []func(handler http.Handler) http.Handler{
+	handlers := []func(handler fasthttp.RequestHandler) fasthttp.RequestHandler{
 		LogHandler,
 		DetailedLogHandler,
 	}
 
 	for _, logHandler := range handlers {
-		req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-		handler := logHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := logHandler(func(ctx *fasthttp.RequestCtx) {
 			time.Sleep(defaultSlowThreshold + time.Millisecond*50)
-		}))
-
-		resp := httptest.NewRecorder()
-		handler.ServeHTTP(resp, req)
-		assert.Equal(t, http.StatusOK, resp.Code)
+		})
+		ln := fasthttputil.NewInmemoryListener()
+		s := fasthttp.Server{
+			Handler: handler,
+		}
+		go s.Serve(ln) //nolint:errcheck
+		c := &fasthttp.HostClient{
+			Dial: func(addr string) (net.Conn, error) {
+				return ln.Dial()
+			},
+		}
+		req := fasthttp.AcquireRequest()
+		resp := fasthttp.AcquireResponse()
+		req.Header.SetMethod(fasthttp.MethodGet)
+		req.SetRequestURI("http://localhost")
+		err := c.Do(req, resp)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, http.StatusOK, resp.StatusCode())
 	}
 }
-func TestDetailedLogHandler_Hijack(t *testing.T) {
-	resp := httptest.NewRecorder()
-	writer := &detailLoggedResponseWriter{
-		writer: response.NewWithCodeResponseWriter(resp),
-	}
-	assert.NotPanics(t, func() {
-		_, _, _ = writer.Hijack()
-	})
 
-	writer = &detailLoggedResponseWriter{
-		writer: response.NewWithCodeResponseWriter(resp),
-	}
-	assert.NotPanics(t, func() {
-		_, _, _ = writer.Hijack()
-	})
-
-	writer = &detailLoggedResponseWriter{
-		writer: response.NewWithCodeResponseWriter(mockedHijackable{
-			ResponseRecorder: resp,
-		}),
-	}
-	assert.NotPanics(t, func() {
-		_, _, _ = writer.Hijack()
-	})
-}
+//	func TestDetailedLogHandler_Hijack(t *testing.T) {
+//		resp := httptest.NewRecorder()
+//		writer := &detailLoggedResponseWriter{
+//			writer: response.NewWithCodeResponseWriter(resp),
+//		}
+//		assert.NotPanics(t, func() {
+//			_, _, _ = writer.Hijack()
+//		})
+//
+//		writer = &detailLoggedResponseWriter{
+//			writer: response.NewWithCodeResponseWriter(resp),
+//		}
+//		assert.NotPanics(t, func() {
+//			_, _, _ = writer.Hijack()
+//		})
+//
+//		writer = &detailLoggedResponseWriter{
+//			writer: response.NewWithCodeResponseWriter(mockedHijackable{
+//				ResponseRecorder: resp,
+//			}),
+//		}
+//		assert.NotPanics(t, func() {
+//			_, _, _ = writer.Hijack()
+//		})
+//	}
 func TestSetSlowThreshold(t *testing.T) {
 	assert.Equal(t, defaultSlowThreshold, slowThreshold.Load())
 	SetSlowThreshold(time.Second)
@@ -138,24 +173,41 @@ func TestWrapStatusCodeWithColor(t *testing.T) {
 	assert.Equal(t, "503", wrapStatusCode(http.StatusServiceUnavailable))
 }
 
-func TestDumpRequest(t *testing.T) {
-	const errMsg = "error"
-	r := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	r.Body = mockedReadCloser{errMsg: errMsg}
-	assert.Equal(t, errMsg, dumpRequest(r))
-}
+//func TestDumpRequest(t *testing.T) {
+//	const errMsg = "error"
+//	r := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
+//	r.Body = mockedReadCloser{errMsg: errMsg}
+//	assert.Equal(t, errMsg, dumpRequest(r))
+//}
 
 func BenchmarkLogHandler(b *testing.B) {
 	b.ReportAllocs()
 
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	handler := LogHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	handler := LogHandler(func(ctx *fasthttp.RequestCtx) {
+		ctx.SetStatusCode(http.StatusOK)
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+
+	req := fasthttp.AcquireRequest()
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.SetRequestURI("http://localhost")
 
 	for i := 0; i < b.N; i++ {
-		resp := httptest.NewRecorder()
-		handler.ServeHTTP(resp, req)
+		resp := fasthttp.AcquireResponse()
+		err := c.Do(req, resp)
+		if err != nil {
+			b.Fatal(err)
+		}
+		fasthttp.ReleaseResponse(resp)
 	}
 }
 

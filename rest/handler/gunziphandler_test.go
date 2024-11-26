@@ -1,15 +1,14 @@
 package handler
 
 import (
-	"bytes"
-	"io"
+	"net"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
 	"github.com/zeromicro/go-zero/core/codec"
 	"github.com/zeromicro/go-zero/rest/httpx"
 )
@@ -18,19 +17,33 @@ func TestGunzipHandler(t *testing.T) {
 	const message = "hello world"
 	var wg sync.WaitGroup
 	wg.Add(1)
-	handler := GunzipHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		assert.Nil(t, err)
+	handler := GunzipHandler(func(ctx *fasthttp.RequestCtx) {
+		body := ctx.PostBody()
 		assert.Equal(t, string(body), message)
 		wg.Done()
-	}))
-
-	req := httptest.NewRequest(http.MethodPost, "http://localhost",
-		bytes.NewReader(codec.Gzip([]byte(message))))
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetBody(codec.Gzip([]byte(message)))
+	req.SetRequestURI("http://localhost")
 	req.Header.Set(httpx.ContentEncoding, gzipEncoding)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
 	wg.Wait()
 }
 
@@ -38,28 +51,59 @@ func TestGunzipHandler_NoGzip(t *testing.T) {
 	const message = "hello world"
 	var wg sync.WaitGroup
 	wg.Add(1)
-	handler := GunzipHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		assert.Nil(t, err)
+	handler := GunzipHandler(func(ctx *fasthttp.RequestCtx) {
+		body := ctx.PostBody()
 		assert.Equal(t, string(body), message)
 		wg.Done()
-	}))
+	})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetBody([]byte(message))
+	req.SetRequestURI("http://localhost")
+	req.Header.Set(httpx.ContentEncoding, gzipEncoding)
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	req := httptest.NewRequest(http.MethodPost, "http://localhost",
-		strings.NewReader(message))
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Equal(t, http.StatusOK, resp.StatusCode())
 	wg.Wait()
 }
 
 func TestGunzipHandler_NoGzipButTelling(t *testing.T) {
 	const message = "hello world"
-	handler := GunzipHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	req := httptest.NewRequest(http.MethodPost, "http://localhost",
-		strings.NewReader(message))
+	handler := GunzipHandler(func(ctx *fasthttp.RequestCtx) {})
+	ln := fasthttputil.NewInmemoryListener()
+	s := fasthttp.Server{
+		Handler: handler,
+	}
+	go s.Serve(ln) //nolint:errcheck
+	c := &fasthttp.HostClient{
+		Dial: func(addr string) (net.Conn, error) {
+			return ln.Dial()
+		},
+	}
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetBody([]byte(message))
+	req.SetRequestURI("http://localhost")
 	req.Header.Set(httpx.ContentEncoding, gzipEncoding)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	assert.Equal(t, http.StatusBadRequest, resp.Code)
+	err := c.Do(req, resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode())
 }
