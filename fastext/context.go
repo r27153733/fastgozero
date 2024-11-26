@@ -19,11 +19,11 @@ func init() {
 
 	tmp := baggage.ContextWithoutBaggage(ctx)
 	keyValue := getCtxKeyValue(tmp)
-	BaggageKey = keyValue
+	BaggageKey = keyValue.key
 
 	tmp = trace.ContextWithSpan(ctx, nil)
 	keyValue = getCtxKeyValue(tmp)
-	CurrentSpanKey = keyValue
+	CurrentSpanKey = keyValue.key
 }
 
 type valueCtx struct {
