@@ -71,7 +71,6 @@ func TestGunzipHandler_NoGzip(t *testing.T) {
 	req.Header.SetMethod(fasthttp.MethodPost)
 	req.SetBody([]byte(message))
 	req.SetRequestURI("http://localhost")
-	req.Header.Set(httpx.ContentEncoding, gzipEncoding)
 	err := c.Do(req, resp)
 	if err != nil {
 		t.Fatal(err)

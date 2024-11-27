@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"net/http"
 
 	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/codec"
@@ -23,6 +24,14 @@ func CryptionHandler(key []byte) func(fasthttp.RequestHandler) fasthttp.RequestH
 func LimitCryptionHandler(limitBytes int64, key []byte) func(handler fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		return func(ctx *fasthttp.RequestCtx) {
+			defer func() {
+				content, err := codec.EcbEncrypt(key, ctx.Response.Body())
+				if err != nil {
+					ctx.SetStatusCode(http.StatusInternalServerError)
+					return
+				}
+				ctx.Response.SetBody([]byte(base64.StdEncoding.EncodeToString(content)))
+			}()
 			if ctx.Request.Header.ContentLength() <= 0 {
 				next(ctx)
 				return
@@ -46,7 +55,7 @@ func decryptBody(limitBytes int64, key []byte, r *fasthttp.Request) error {
 
 	var content []byte
 	var err error
-	if contentLength > 0 {
+	if !r.IsBodyStream() {
 		content = r.Body()
 	} else {
 		content, err = io.ReadAll(io.LimitReader(r.BodyStream(), maxBytes))
