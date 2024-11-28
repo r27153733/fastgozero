@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/valyala/bytebufferpool"
+	"github.com/zeromicro/go-zero/fastext"
 	"io"
 	"log"
 	"path"
@@ -338,18 +340,20 @@ func combineGlobalFields(fields []LogField) []LogField {
 	return ret
 }
 
-func marshalJson(t interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
+var contentPool bytebufferpool.Pool
+
+func marshalJson(t interface{}) (*bytebufferpool.ByteBuffer, error) {
+	buf := contentPool.Get()
+	encoder := json.NewEncoder(buf)
 	encoder.SetEscapeHTML(false)
 	err := encoder.Encode(t)
 	// go 1.5+ will append a newline to the end of the json string
 	// https://github.com/golang/go/issues/13520
-	if l := buf.Len(); l > 0 && buf.Bytes()[l-1] == '\n' {
-		buf.Truncate(l - 1)
+	if l := buf.Len(); l > 0 && buf.B[l-1] == '\n' {
+		buf.B = buf.B[:l-1]
 	}
 
-	return buf.Bytes(), err
+	return buf, err
 }
 
 func output(writer io.Writer, level string, val any, fields ...LogField) {
@@ -374,10 +378,12 @@ func output(writer io.Writer, level string, val any, fields ...LogField) {
 		plainFields := buildPlainFields(entry)
 		writePlainAny(writer, level, val, plainFields...)
 	default:
-		entry[timestampKey] = getTimestamp()
+		timestamp := getTimestamp()
+		entry[timestampKey] = timestamp
 		entry[levelKey] = level
 		entry[contentKey] = val
 		writeJson(writer, entry)
+		releaseTimestamp(timestamp)
 	}
 }
 
@@ -408,12 +414,14 @@ func wrapLevelWithColor(level string) string {
 }
 
 func writeJson(writer io.Writer, info any) {
-	if content, err := marshalJson(info); err != nil {
+	content, err := marshalJson(info)
+	defer contentPool.Put(content)
+	if err != nil {
 		log.Printf("err: %s\n\n%s", err.Error(), debug.Stack())
 	} else if writer == nil {
-		log.Println(string(content))
+		log.Println(fastext.B2s(content.B))
 	} else {
-		if _, err := writer.Write(append(content, '\n')); err != nil {
+		if _, err := writer.Write(append(content.B, '\n')); err != nil {
 			log.Println(err.Error())
 		}
 	}

@@ -2,8 +2,11 @@ package logx
 
 import (
 	"fmt"
+	"github.com/zeromicro/go-zero/fastext"
+	"github.com/zeromicro/go-zero/fastext/fasttime"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,8 +19,27 @@ func getCaller(callDepth int) string {
 	return prettyCaller(file, line)
 }
 
+var timestampPoll sync.Pool
+
 func getTimestamp() string {
-	return time.Now().Format(timeFormat)
+	v := timestampPoll.Get()
+	var buf []byte
+	if v == nil {
+		buf = make([]byte, 0, len(timeFormat))
+	} else {
+		buf = v.([]byte)
+	}
+	var t time.Time
+	if isSecondPrecision {
+		t = fasttime.Timestamp()
+	} else {
+		t = time.Now()
+	}
+	return fastext.B2s(t.AppendFormat(buf, timeFormat))
+}
+
+func releaseTimestamp(timestamp string) {
+	timestampPoll.Put(fastext.S2B(timestamp)[:0])
 }
 
 func prettyCaller(file string, line int) string {

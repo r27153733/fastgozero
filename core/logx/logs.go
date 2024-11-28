@@ -8,6 +8,7 @@ import (
 	"path"
 	"reflect"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,8 +19,9 @@ import (
 const callerDepth = 4
 
 var (
-	timeFormat        = "2006-01-02T15:04:05.000Z07:00"
-	encoding   uint32 = jsonEncodingType
+	timeFormat               = "2006-01-02T15:04:05.000Z07:00"
+	isSecondPrecision        = false
+	encoding          uint32 = jsonEncodingType
 	// maxContentLength is used to truncate the log content, 0 for not truncating.
 	maxContentLength uint32
 	// use uint32 for atomic operations
@@ -292,6 +294,9 @@ func SetUp(c LogConf) (err error) {
 
 		if len(c.TimeFormat) > 0 {
 			timeFormat = c.TimeFormat
+			if !strings.Contains(timeFormat, "\\.") {
+				isSecondPrecision = true
+			}
 		}
 
 		if len(c.FileTimeFormat) > 0 {

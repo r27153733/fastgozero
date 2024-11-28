@@ -1,6 +1,9 @@
 package logx
 
-import "log"
+import (
+	"github.com/zeromicro/go-zero/fastext"
+	"log"
+)
 
 type logWriter struct {
 	logger *log.Logger
@@ -17,6 +20,6 @@ func (lw logWriter) Close() error {
 }
 
 func (lw logWriter) Write(data []byte) (int, error) {
-	lw.logger.Print(string(data))
+	lw.logger.Print(fastext.B2s(data))
 	return len(data), nil
 }

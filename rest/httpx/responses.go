@@ -5,21 +5,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/valyala/fasthttp"
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
+	"github.com/valyala/fasthttp"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/rest/internal/errcode"
 	"github.com/zeromicro/go-zero/rest/internal/header"
 )
 
 var (
-	errorHandler func(context.Context, error) (int, any)
-	errorLock    sync.RWMutex
-	okHandler    func(context.Context, any) any
-	okLock       sync.RWMutex
+	errorHandler atomic.Pointer[func(context.Context, error) (int, any)]
+	//errorLock    sync.RWMutex
+	okHandler atomic.Pointer[func(context.Context, any) any]
+	//okLock       sync.RWMutex
 )
 
 // Error writes err into w.
@@ -43,22 +44,18 @@ func Ok(w http.ResponseWriter) {
 
 // OkJson writes v into w with 200 OK.
 func OkJson(w *fasthttp.Response, v any) {
-	okLock.RLock()
-	handler := okHandler
-	okLock.RUnlock()
+	handler := okHandler.Load()
 	if handler != nil {
-		v = handler(context.Background(), v)
+		v = (*handler)(context.Background(), v)
 	}
 	WriteJson(w, http.StatusOK, v)
 }
 
 // OkJsonCtx writes v into w with 200 OK.
 func OkJsonCtx(ctx *fasthttp.RequestCtx, v any) {
-	okLock.RLock()
-	handlerCtx := okHandler
-	okLock.RUnlock()
+	handlerCtx := okHandler.Load()
 	if handlerCtx != nil {
-		v = handlerCtx(ctx, v)
+		v = (*handlerCtx)(ctx, v)
 	}
 	WriteJsonCtx(ctx, http.StatusOK, v)
 }
@@ -67,27 +64,22 @@ func OkJsonCtx(ctx *fasthttp.RequestCtx, v any) {
 // Notice: SetErrorHandler and SetErrorHandlerCtx set the same error handler.
 // Keeping both SetErrorHandler and SetErrorHandlerCtx is for backward compatibility.
 func SetErrorHandler(handler func(error) (int, any)) {
-	errorLock.Lock()
-	defer errorLock.Unlock()
-	errorHandler = func(_ context.Context, err error) (int, any) {
+	f := func(_ context.Context, err error) (int, any) {
 		return handler(err)
 	}
+	errorHandler.Store(&f)
 }
 
 // SetErrorHandlerCtx sets the error handler, which is called on calling Error.
 // Notice: SetErrorHandler and SetErrorHandlerCtx set the same error handler.
 // Keeping both SetErrorHandler and SetErrorHandlerCtx is for backward compatibility.
 func SetErrorHandlerCtx(handlerCtx func(context.Context, error) (int, any)) {
-	errorLock.Lock()
-	defer errorLock.Unlock()
-	errorHandler = handlerCtx
+	errorHandler.Store(&handlerCtx)
 }
 
 // SetOkHandler sets the response handler, which is called on calling OkJson and OkJsonCtx.
 func SetOkHandler(handler func(context.Context, any) any) {
-	okLock.Lock()
-	defer okLock.Unlock()
-	okHandler = handler
+	okHandler.Store(&handler)
 }
 
 // Stream writes data into w with streaming mode.
@@ -128,14 +120,12 @@ func WriteJsonCtx(ctx *fasthttp.RequestCtx, code int, v any) {
 }
 
 func buildErrorHandler(ctx context.Context) func(error) (int, any) {
-	errorLock.RLock()
-	handlerCtx := errorHandler
-	errorLock.RUnlock()
+	handlerCtx := errorHandler.Load()
 
 	var handler func(error) (int, any)
 	if handlerCtx != nil {
 		handler = func(err error) (int, any) {
-			return handlerCtx(ctx, err)
+			return (*handlerCtx)(ctx, err)
 		}
 	}
 
