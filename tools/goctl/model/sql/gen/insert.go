@@ -5,11 +5,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/zeromicro/go-zero/core/collection"
-	"github.com/zeromicro/go-zero/tools/goctl/model/sql/template"
-	"github.com/zeromicro/go-zero/tools/goctl/util"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
-	"github.com/zeromicro/go-zero/tools/goctl/util/stringx"
+	"github.com/r27153733/fastgozero/core/collection"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/model/sql/template"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/stringx"
 )
 
 func genInsert(table Table, withCache, postgreSql bool) (string, string, error) {

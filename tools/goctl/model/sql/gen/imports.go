@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zeromicro/go-zero/tools/goctl/model/sql/template"
-	"github.com/zeromicro/go-zero/tools/goctl/util"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/model/sql/template"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 )
 
 func genImports(table Table, withCache, timeImport bool) (string, error) {

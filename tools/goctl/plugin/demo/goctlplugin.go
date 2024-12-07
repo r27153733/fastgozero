@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/zeromicro/go-zero/tools/goctl/plugin"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/plugin"
 )
 
 func main() {

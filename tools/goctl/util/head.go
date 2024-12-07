@@ -1,6 +1,6 @@
 package util
 
-import "github.com/zeromicro/go-zero/tools/goctl/internal/version"
+import "github.com/r27153733/fastgozero/tools/fastgoctl/internal/version"
 
 const (
 	// DoNotEditHead added to the beginning of a file to prompt the user not to edit

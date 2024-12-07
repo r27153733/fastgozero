@@ -3,9 +3,9 @@ package generator
 import (
 	"log"
 
-	conf "github.com/zeromicro/go-zero/tools/goctl/config"
-	"github.com/zeromicro/go-zero/tools/goctl/env"
-	"github.com/zeromicro/go-zero/tools/goctl/util/console"
+	conf "github.com/r27153733/fastgozero/tools/fastgoctl/config"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/env"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/console"
 )
 
 // Generator defines the environment needs of rpc service generation

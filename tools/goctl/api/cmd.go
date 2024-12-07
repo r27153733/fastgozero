@@ -1,20 +1,20 @@
 package api
 
 import (
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/apigen"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/dartgen"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/docgen"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/format"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/gogen"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/javagen"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/ktgen"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/new"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/tsgen"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/validate"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/config"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/internal/cobrax"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/plugin"
 	"github.com/spf13/cobra"
-	"github.com/zeromicro/go-zero/tools/goctl/api/apigen"
-	"github.com/zeromicro/go-zero/tools/goctl/api/dartgen"
-	"github.com/zeromicro/go-zero/tools/goctl/api/docgen"
-	"github.com/zeromicro/go-zero/tools/goctl/api/format"
-	"github.com/zeromicro/go-zero/tools/goctl/api/gogen"
-	"github.com/zeromicro/go-zero/tools/goctl/api/javagen"
-	"github.com/zeromicro/go-zero/tools/goctl/api/ktgen"
-	"github.com/zeromicro/go-zero/tools/goctl/api/new"
-	"github.com/zeromicro/go-zero/tools/goctl/api/tsgen"
-	"github.com/zeromicro/go-zero/tools/goctl/api/validate"
-	"github.com/zeromicro/go-zero/tools/goctl/config"
-	"github.com/zeromicro/go-zero/tools/goctl/internal/cobrax"
-	"github.com/zeromicro/go-zero/tools/goctl/plugin"
 )
 
 var (

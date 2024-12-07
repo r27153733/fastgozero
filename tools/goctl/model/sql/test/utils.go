@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/mapping"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/core/mapping"
 )
 
 // ErrNotFound is the alias of sql.ErrNoRows

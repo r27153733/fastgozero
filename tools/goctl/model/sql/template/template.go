@@ -4,8 +4,8 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/zeromicro/go-zero/tools/goctl/internal/version"
-	"github.com/zeromicro/go-zero/tools/goctl/util"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/internal/version"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util"
 )
 
 // Customized defines a template for customized in model

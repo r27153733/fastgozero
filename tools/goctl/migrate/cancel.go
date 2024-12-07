@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/zeromicro/go-zero/core/syncx"
-	"github.com/zeromicro/go-zero/tools/goctl/util/console"
+	"github.com/r27153733/fastgozero/core/syncx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/console"
 )
 
 func cancelOnSignals() {

@@ -1,9 +1,9 @@
 package model
 
 {{if .Cache}}import (
-    "github.com/zeromicro/go-zero/core/stores/cache"
-    "github.com/zeromicro/go-zero/core/stores/monc"
-){{else}}import "github.com/zeromicro/go-zero/core/stores/mon"{{end}}
+    "github.com/r27153733/fastgozero/core/stores/cache"
+    "github.com/r27153733/fastgozero/core/stores/monc"
+){{else}}import "github.com/r27153733/fastgozero/core/stores/mon"{{end}}
 
 {{if .Easy}}
 const {{.Type}}CollectionName = "{{.snakeType}}"

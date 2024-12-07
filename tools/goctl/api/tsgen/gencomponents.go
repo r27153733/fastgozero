@@ -6,10 +6,10 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/zeromicro/go-zero/tools/goctl/api/spec"
-	apiutil "github.com/zeromicro/go-zero/tools/goctl/api/util"
-	"github.com/zeromicro/go-zero/tools/goctl/internal/version"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/spec"
+	apiutil "github.com/r27153733/fastgozero/tools/fastgoctl/api/util"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/internal/version"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 )
 
 //go:embed components.tpl

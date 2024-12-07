@@ -1,10 +1,10 @@
 package rpc
 
 import (
+	"github.com/r27153733/fastgozero/tools/fastgoctl/config"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/internal/cobrax"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/rpc/cli"
 	"github.com/spf13/cobra"
-	"github.com/zeromicro/go-zero/tools/goctl/config"
-	"github.com/zeromicro/go-zero/tools/goctl/internal/cobrax"
-	"github.com/zeromicro/go-zero/tools/goctl/rpc/cli"
 )
 
 var (

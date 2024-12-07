@@ -10,13 +10,13 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/zeromicro/go-zero/core/collection"
-	"github.com/zeromicro/go-zero/tools/goctl/api/spec"
-	"github.com/zeromicro/go-zero/tools/goctl/config"
-	"github.com/zeromicro/go-zero/tools/goctl/internal/version"
-	"github.com/zeromicro/go-zero/tools/goctl/util/format"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
-	"github.com/zeromicro/go-zero/tools/goctl/vars"
+	"github.com/r27153733/fastgozero/core/collection"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/spec"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/config"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/internal/version"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/format"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/vars"
 )
 
 const (

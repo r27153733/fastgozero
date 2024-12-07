@@ -33,7 +33,7 @@ LABEL org.opencontainers.image.authors="Kevin Wan"
 LABEL org.opencontainers.image.base.name="docker.io/library/golang:alpine"
 LABEL org.opencontainers.image.description="A cloud-native Go microservices framework with cli tool for productivity."
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.source="https://github.com/zeromicro/go-zero"
+LABEL org.opencontainers.image.source="https://github.com/r27153733/fastgozero"
 LABEL org.opencontainers.image.title="goctl (cli)"
 
 ENTRYPOINT ["/usr/local/bin/goctl"]

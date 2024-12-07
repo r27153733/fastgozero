@@ -7,11 +7,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/zeromicro/go-zero/core/collection"
-	"github.com/zeromicro/go-zero/tools/goctl/api/spec"
-	"github.com/zeromicro/go-zero/tools/goctl/api/util"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/golang"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
+	"github.com/r27153733/fastgozero/core/collection"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/spec"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/util"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/golang"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 )
 
 type fileGenConfig struct {

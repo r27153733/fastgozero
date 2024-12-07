@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"unicode"
 
-	"github.com/zeromicro/go-zero/tools/goctl/api/parser/g4/ast"
-	"github.com/zeromicro/go-zero/tools/goctl/api/parser/g4/gen/api"
-	"github.com/zeromicro/go-zero/tools/goctl/api/spec"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/env"
-	apiParser "github.com/zeromicro/go-zero/tools/goctl/pkg/parser/api/parser"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/parser/g4/ast"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/parser/g4/gen/api"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/spec"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/env"
+	apiParser "github.com/r27153733/fastgozero/tools/fastgoctl/pkg/parser/api/parser"
 )
 
 type parser struct {

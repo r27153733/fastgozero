@@ -4,7 +4,7 @@ import (
 	{{.ImportPackages}}
 
     "github.com/valyala/fasthttp"
-    "github.com/zeromicro/go-zero/rest/httpx"
+    "github.com/r27153733/fastgozero/rest/httpx"
 )
 
 {{if .HasDoc}}{{.Doc}}{{end}}

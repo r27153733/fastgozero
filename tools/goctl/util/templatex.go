@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"text/template"
 
-	"github.com/zeromicro/go-zero/tools/goctl/internal/errorx"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/internal/errorx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 )
 
 const regularPerm = 0o666

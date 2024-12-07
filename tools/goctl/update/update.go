@@ -6,11 +6,11 @@ import (
 	"os"
 	"path"
 
-	"github.com/zeromicro/go-zero/core/conf"
-	"github.com/zeromicro/go-zero/core/hash"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/tools/goctl/update/config"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
+	"github.com/r27153733/fastgozero/core/conf"
+	"github.com/r27153733/fastgozero/core/hash"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/update/config"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 )
 
 const (

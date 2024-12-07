@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/zeromicro/go-zero/tools/goctl/pkg/parser/api/token"
+import "github.com/r27153733/fastgozero/tools/fastgoctl/pkg/parser/api/token"
 
 // SyntaxStmt represents a syntax statement.
 type SyntaxStmt struct {

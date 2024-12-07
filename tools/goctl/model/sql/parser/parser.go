@@ -6,13 +6,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/r27153733/fastgozero/core/collection"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/model/sql/converter"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/model/sql/model"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/model/sql/util"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/console"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/stringx"
 	"github.com/zeromicro/ddl-parser/parser"
-	"github.com/zeromicro/go-zero/core/collection"
-	"github.com/zeromicro/go-zero/tools/goctl/model/sql/converter"
-	"github.com/zeromicro/go-zero/tools/goctl/model/sql/model"
-	"github.com/zeromicro/go-zero/tools/goctl/model/sql/util"
-	"github.com/zeromicro/go-zero/tools/goctl/util/console"
-	"github.com/zeromicro/go-zero/tools/goctl/util/stringx"
 )
 
 const timeImport = "time.Time"

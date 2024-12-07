@@ -12,15 +12,15 @@ import (
 	"time"
 
 	"github.com/gookit/color"
+	"github.com/r27153733/fastgozero/core/logx"
+	apiformat "github.com/r27153733/fastgozero/tools/fastgoctl/api/format"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/parser"
+	apiutil "github.com/r27153733/fastgozero/tools/fastgoctl/api/util"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/config"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/golang"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 	"github.com/spf13/cobra"
-	"github.com/zeromicro/go-zero/core/logx"
-	apiformat "github.com/zeromicro/go-zero/tools/goctl/api/format"
-	"github.com/zeromicro/go-zero/tools/goctl/api/parser"
-	apiutil "github.com/zeromicro/go-zero/tools/goctl/api/util"
-	"github.com/zeromicro/go-zero/tools/goctl/config"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/golang"
-	"github.com/zeromicro/go-zero/tools/goctl/util"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
 )
 
 const tmpFile = "%s-%d"

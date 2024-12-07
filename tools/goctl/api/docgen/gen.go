@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/parser"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 	"github.com/spf13/cobra"
-	"github.com/zeromicro/go-zero/tools/goctl/api/parser"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
 )
 
 var (

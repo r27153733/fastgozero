@@ -6,9 +6,9 @@ package server
 import (
 	"context"
 
-	eventlogic "github.com/zeromicro/go-zero/tools/goctl/example/rpc/hi/internal/logic/event"
-	"github.com/zeromicro/go-zero/tools/goctl/example/rpc/hi/internal/svc"
-	"github.com/zeromicro/go-zero/tools/goctl/example/rpc/hi/pb/hi"
+	eventlogic "github.com/r27153733/fastgozero/tools/fastgoctl/example/rpc/hi/internal/logic/event"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/example/rpc/hi/internal/svc"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/example/rpc/hi/pb/hi"
 )
 
 type EventServer struct {

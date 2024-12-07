@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/parser/api/ast"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/parser/api/scanner"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/parser/api/token"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/parser/api/ast"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/parser/api/scanner"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/parser/api/token"
 )
 
 const (

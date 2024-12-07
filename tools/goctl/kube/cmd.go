@@ -1,6 +1,6 @@
 package kube
 
-import "github.com/zeromicro/go-zero/tools/goctl/internal/cobrax"
+import "github.com/r27153733/fastgozero/tools/fastgoctl/internal/cobrax"
 
 var (
 	varStringName            string

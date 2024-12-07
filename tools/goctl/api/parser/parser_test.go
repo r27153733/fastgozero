@@ -4,8 +4,8 @@ import (
 	_ "embed"
 	"testing"
 
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/spec"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/tools/goctl/api/spec"
 )
 
 //go:embed testdata/test.api

@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/r27153733/fastgozero/tools/fastgoctl/rpc/generator"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/console"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 	"github.com/spf13/cobra"
-	"github.com/zeromicro/go-zero/tools/goctl/rpc/generator"
-	"github.com/zeromicro/go-zero/tools/goctl/util"
-	"github.com/zeromicro/go-zero/tools/goctl/util/console"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
 )
 
 var (

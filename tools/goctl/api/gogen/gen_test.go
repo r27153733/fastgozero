@@ -13,11 +13,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/r27153733/fastgozero/tools/fastgoctl/api/parser"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/env"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/rpc/execx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/tools/goctl/api/parser"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/env"
-	"github.com/zeromicro/go-zero/tools/goctl/rpc/execx"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
 )
 
 var (

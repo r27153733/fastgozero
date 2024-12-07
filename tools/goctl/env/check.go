@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/env"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/protoc"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/protocgengo"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/pkg/protocgengogrpc"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/console"
 	"github.com/spf13/cobra"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/env"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/protoc"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/protocgengo"
-	"github.com/zeromicro/go-zero/tools/goctl/pkg/protocgengogrpc"
-	"github.com/zeromicro/go-zero/tools/goctl/util/console"
 )
 
 type bin struct {

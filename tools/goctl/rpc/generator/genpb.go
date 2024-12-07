@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zeromicro/go-zero/tools/goctl/rpc/execx"
-	"github.com/zeromicro/go-zero/tools/goctl/util/pathx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/rpc/execx"
+	"github.com/r27153733/fastgozero/tools/fastgoctl/util/pathx"
 )
 
 // GenPb generates the pb.go file, which is a layer of packaging for protoc to generate gprc,
