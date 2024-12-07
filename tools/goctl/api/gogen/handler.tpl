@@ -1,27 +1,27 @@
 package {{.PkgName}}
 
 import (
-	"net/http"
-
-	"github.com/zeromicro/go-zero/rest/httpx"
 	{{.ImportPackages}}
+
+    "github.com/valyala/fasthttp"
+    "github.com/zeromicro/go-zero/rest/httpx"
 )
 
 {{if .HasDoc}}{{.Doc}}{{end}}
-func {{.HandlerName}}(svcCtx *svc.ServiceContext) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func {{.HandlerName}}(svcCtx *svc.ServiceContext) fasthttp.RequestHandler {
+	return func(ctx *fasthttp.RequestCtx) {
 		{{if .HasRequest}}var req types.{{.RequestType}}
-		if err := httpx.Parse(r, &req); err != nil {
-			httpx.ErrorCtx(r.Context(), w, err)
+		if err := httpx.Parse(ctx, &req); err != nil {
+			httpx.ErrorCtx(ctx, err)
 			return
 		}
 
-		{{end}}l := {{.LogicName}}.New{{.LogicType}}(r.Context(), svcCtx)
+		{{end}}l := {{.LogicName}}.New{{.LogicType}}(ctx, svcCtx)
 		{{if .HasResp}}resp, {{end}}err := l.{{.Call}}({{if .HasRequest}}&req{{end}})
 		if err != nil {
-			httpx.ErrorCtx(r.Context(), w, err)
+			httpx.ErrorCtx(ctx, err)
 		} else {
-			{{if .HasResp}}httpx.OkJsonCtx(r.Context(), w, resp){{else}}httpx.Ok(w){{end}}
+			{{if .HasResp}}httpx.OkJsonCtx(ctx, resp){{else}}httpx.Ok(&ctx.Response){{end}}
 		}
 	}
 }
