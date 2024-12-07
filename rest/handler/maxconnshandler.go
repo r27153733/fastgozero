@@ -2,7 +2,6 @@ package handler
 
 import (
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/syncx"
 	"github.com/zeromicro/go-zero/rest/internal"
 )
@@ -16,16 +15,11 @@ func MaxConnsHandler(n int) func(fasthttp.RequestHandler) fasthttp.RequestHandle
 	}
 
 	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
-		latch := syncx.NewLimit(n)
+		latch := syncx.NewAtomicLimit(n)
 
 		return func(ctx *fasthttp.RequestCtx) {
 			if latch.TryBorrow() {
-				defer func() {
-					if err := latch.Return(); err != nil {
-						logx.WithContext(ctx).Error(err)
-					}
-				}()
-
+				defer latch.Return()
 				next(ctx)
 			} else {
 				internal.Errorf(ctx, "concurrent connections over %d, rejected with code %d",
