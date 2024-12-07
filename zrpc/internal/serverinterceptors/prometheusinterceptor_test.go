@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/prometheus"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/prometheus"
 	"google.golang.org/grpc"
 )
 

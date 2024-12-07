@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/r27153733/fastgozero/core/iox"
+	"github.com/r27153733/fastgozero/core/lang"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/iox"
-	"github.com/zeromicro/go-zero/core/lang"
 )
 
 func TestEnterToContinue(t *testing.T) {

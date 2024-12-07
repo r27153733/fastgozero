@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/r27153733/fastgozero/core/stringx"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/stringx"
 	"go.uber.org/goleak"
 )
 

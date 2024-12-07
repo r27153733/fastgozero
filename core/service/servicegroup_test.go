@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/proc"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/proc"
 )
 
 var (

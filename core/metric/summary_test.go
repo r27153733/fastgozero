@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/r27153733/fastgozero/core/proc"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/proc"
 )
 
 func TestNewSummaryVec(t *testing.T) {

@@ -3,12 +3,12 @@ package handler
 import (
 	"strings"
 
+	"github.com/r27153733/fastgozero/core/collection"
+	"github.com/r27153733/fastgozero/core/trace"
+	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/fastext/otel/propagation"
+	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/collection"
-	"github.com/zeromicro/go-zero/core/trace"
-	"github.com/zeromicro/go-zero/fastext"
-	"github.com/zeromicro/go-zero/fastext/otel/propagation"
-	"github.com/zeromicro/go-zero/rest/httpx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"

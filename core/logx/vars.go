@@ -3,7 +3,7 @@ package logx
 import (
 	"errors"
 
-	"github.com/zeromicro/go-zero/core/syncx"
+	"github.com/r27153733/fastgozero/core/syncx"
 )
 
 const (

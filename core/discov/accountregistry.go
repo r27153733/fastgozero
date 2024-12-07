@@ -1,6 +1,6 @@
 package discov
 
-import "github.com/zeromicro/go-zero/core/discov/internal"
+import "github.com/r27153733/fastgozero/core/discov/internal"
 
 // RegisterAccount registers the username/password to the given etcd cluster.
 func RegisterAccount(endpoints []string, user, pass string) {

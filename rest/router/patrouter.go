@@ -2,15 +2,15 @@ package router
 
 import (
 	"errors"
+	"github.com/r27153733/fastgozero/fastext"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/fastext"
 	"net/http"
 	"path"
 	"strings"
 
-	"github.com/zeromicro/go-zero/core/search"
-	"github.com/zeromicro/go-zero/rest/httpx"
-	"github.com/zeromicro/go-zero/rest/pathvar"
+	"github.com/r27153733/fastgozero/core/search"
+	"github.com/r27153733/fastgozero/rest/httpx"
+	"github.com/r27153733/fastgozero/rest/pathvar"
 )
 
 const (

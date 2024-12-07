@@ -5,9 +5,9 @@ import (
 	"math"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/core/mathx"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/mathx"
 )
 
 var (

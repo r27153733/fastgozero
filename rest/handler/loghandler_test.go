@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/r27153733/fastgozero/rest/internal"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/rest/internal"
 )
 
 func TestLogHandler(t *testing.T) {

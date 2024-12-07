@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/r27153733/fastgozero/core/discov"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/internal/mock"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/discov"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/internal/mock"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"

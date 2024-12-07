@@ -1,8 +1,8 @@
 package handler
 
 import (
+	"github.com/r27153733/fastgozero/rest/internal"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/rest/internal"
 )
 
 // MaxBytesHandler returns a middleware that limit reading of http request body.

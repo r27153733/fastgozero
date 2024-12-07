@@ -2,7 +2,7 @@ package metric
 
 import (
 	prom "github.com/prometheus/client_golang/prometheus"
-	"github.com/zeromicro/go-zero/core/proc"
+	"github.com/r27153733/fastgozero/core/proc"
 )
 
 type (

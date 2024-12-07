@@ -6,11 +6,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/rescue"
-	"github.com/zeromicro/go-zero/core/stat"
-	"github.com/zeromicro/go-zero/core/threading"
-	"github.com/zeromicro/go-zero/core/timex"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/core/rescue"
+	"github.com/r27153733/fastgozero/core/stat"
+	"github.com/r27153733/fastgozero/core/threading"
+	"github.com/r27153733/fastgozero/core/timex"
 )
 
 const queueName = "queue"

@@ -1,8 +1,8 @@
 package fx
 
 import (
-	"github.com/zeromicro/go-zero/core/errorx"
-	"github.com/zeromicro/go-zero/core/threading"
+	"github.com/r27153733/fastgozero/core/errorx"
+	"github.com/r27153733/fastgozero/core/threading"
 )
 
 // Parallel runs fns parallelly and waits for done.

@@ -2,18 +2,18 @@ package handler
 
 import (
 	"context"
+	"github.com/r27153733/fastgozero/fastext/otel/propagation"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttputil"
-	"github.com/zeromicro/go-zero/fastext/otel/propagation"
 
 	"net"
 	"strconv"
 	"testing"
 
+	ztrace "github.com/r27153733/fastgozero/core/trace"
+	"github.com/r27153733/fastgozero/core/trace/tracetest"
+	"github.com/r27153733/fastgozero/rest/chain"
 	"github.com/stretchr/testify/assert"
-	ztrace "github.com/zeromicro/go-zero/core/trace"
-	"github.com/zeromicro/go-zero/core/trace/tracetest"
-	"github.com/zeromicro/go-zero/rest/chain"
 	"go.opentelemetry.io/otel"
 	tcodes "go.opentelemetry.io/otel/codes"
 

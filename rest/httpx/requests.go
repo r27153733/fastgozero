@@ -1,18 +1,18 @@
 package httpx
 
 import (
+	"github.com/r27153733/fastgozero/fastext"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/fastext"
 	"io"
 	"reflect"
 	"strings"
 	"sync/atomic"
 
-	"github.com/zeromicro/go-zero/core/mapping"
-	"github.com/zeromicro/go-zero/core/validation"
-	"github.com/zeromicro/go-zero/rest/internal/encoding"
-	"github.com/zeromicro/go-zero/rest/internal/header"
-	"github.com/zeromicro/go-zero/rest/pathvar"
+	"github.com/r27153733/fastgozero/core/mapping"
+	"github.com/r27153733/fastgozero/core/validation"
+	"github.com/r27153733/fastgozero/rest/internal/encoding"
+	"github.com/r27153733/fastgozero/rest/internal/header"
+	"github.com/r27153733/fastgozero/rest/pathvar"
 )
 
 const (

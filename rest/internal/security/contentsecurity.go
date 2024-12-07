@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zeromicro/go-zero/core/codec"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/rest/httpx"
+	"github.com/r27153733/fastgozero/core/codec"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/rest/httpx"
 )
 
 const (

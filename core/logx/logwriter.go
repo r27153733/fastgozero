@@ -1,7 +1,7 @@
 package logx
 
 import (
-	"github.com/zeromicro/go-zero/fastext"
+	"github.com/r27153733/fastgozero/fastext"
 	"log"
 )
 

@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/r27153733/fastgozero/rest/internal/header"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/rest/internal/header"
 )
 
 func TestNamedService_DoRequest(t *testing.T) {

@@ -1,11 +1,11 @@
 package encoding
 
 import (
+	"github.com/r27153733/fastgozero/fastext"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/fastext"
 	"net/textproto"
 
-	"github.com/zeromicro/go-zero/core/mapping"
+	"github.com/r27153733/fastgozero/core/mapping"
 )
 
 const headerKey = "header"

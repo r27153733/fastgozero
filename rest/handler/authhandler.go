@@ -4,10 +4,10 @@ import (
 	"errors"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/rest/token"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/fastext"
-	"github.com/zeromicro/go-zero/rest/token"
 )
 
 const (

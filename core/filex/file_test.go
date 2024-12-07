@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/fs"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/fs"
 )
 
 const (

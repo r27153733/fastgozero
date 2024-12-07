@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/r27153733/fastgozero/core/proc"
+	"github.com/r27153733/fastgozero/core/timex"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/proc"
-	"github.com/zeromicro/go-zero/core/timex"
 )
 
 const threshold = 10

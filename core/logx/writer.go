@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/r27153733/fastgozero/fastext"
 	"github.com/valyala/bytebufferpool"
-	"github.com/zeromicro/go-zero/fastext"
 	"io"
 	"log"
 	"path"
@@ -14,8 +14,8 @@ import (
 	"sync/atomic"
 
 	fatihcolor "github.com/fatih/color"
-	"github.com/zeromicro/go-zero/core/color"
-	"github.com/zeromicro/go-zero/core/errorx"
+	"github.com/r27153733/fastgozero/core/color"
+	"github.com/r27153733/fastgozero/core/errorx"
 )
 
 type (

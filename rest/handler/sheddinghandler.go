@@ -4,12 +4,12 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/r27153733/fastgozero/core/load"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/core/stat"
+	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/load"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/stat"
-	"github.com/zeromicro/go-zero/fastext"
-	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 const serviceType = "api"

@@ -4,8 +4,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zeromicro/go-zero/core/syncx"
-	"github.com/zeromicro/go-zero/core/timex"
+	"github.com/r27153733/fastgozero/core/syncx"
+	"github.com/r27153733/fastgozero/core/timex"
 )
 
 type limitedExecutor struct {

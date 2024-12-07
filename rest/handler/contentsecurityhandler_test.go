@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/r27153733/fastgozero/core/codec"
+	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttputil"
-	"github.com/zeromicro/go-zero/core/codec"
-	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 const timeDiff = time.Hour * 2 * 24

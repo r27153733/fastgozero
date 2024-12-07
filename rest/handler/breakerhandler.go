@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/r27153733/fastgozero/core/breaker"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/core/stat"
+	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/breaker"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/stat"
-	"github.com/zeromicro/go-zero/fastext"
-	"github.com/zeromicro/go-zero/rest/httpx"
 )
 
 const breakerSeparator = "://"

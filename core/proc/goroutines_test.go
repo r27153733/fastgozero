@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/logx/logtest"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/logx/logtest"
 )
 
 func TestDumpGoroutines(t *testing.T) {

@@ -3,8 +3,8 @@ package redis
 import (
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/stringx"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/stringx"
 )
 
 func TestRedisConf(t *testing.T) {

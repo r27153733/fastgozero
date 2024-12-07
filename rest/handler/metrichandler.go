@@ -1,9 +1,9 @@
 package handler
 
 import (
+	"github.com/r27153733/fastgozero/core/stat"
+	"github.com/r27153733/fastgozero/core/timex"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/stat"
-	"github.com/zeromicro/go-zero/core/timex"
 )
 
 // MetricHandler returns a middleware that stat the metrics.

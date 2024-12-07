@@ -3,10 +3,10 @@ package zrpc
 import (
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/discov"
+	"github.com/r27153733/fastgozero/core/service"
+	"github.com/r27153733/fastgozero/core/stores/redis"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/discov"
-	"github.com/zeromicro/go-zero/core/service"
-	"github.com/zeromicro/go-zero/core/stores/redis"
 )
 
 func TestRpcClientConf(t *testing.T) {

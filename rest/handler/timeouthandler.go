@@ -3,8 +3,8 @@ package handler
 import (
 	"time"
 
+	"github.com/r27153733/fastgozero/fastext"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/fastext"
 )
 
 const (

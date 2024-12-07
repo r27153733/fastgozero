@@ -3,7 +3,7 @@ package cache
 import (
 	"testing"
 
-	"github.com/zeromicro/go-zero/core/timex"
+	"github.com/r27153733/fastgozero/core/timex"
 )
 
 func TestCacheStat_statLoop(t *testing.T) {

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/r27153733/fastgozero/rest/internal/header"
+	"github.com/r27153733/fastgozero/rest/pathvar"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/rest/internal/header"
-	"github.com/zeromicro/go-zero/rest/pathvar"
 )
 
 func TestParseForm(t *testing.T) {

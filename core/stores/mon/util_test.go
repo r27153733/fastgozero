@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/logx/logtest"
+	"github.com/r27153733/fastgozero/core/timex"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/logx/logtest"
-	"github.com/zeromicro/go-zero/core/timex"
 )
 
 func TestFormatAddrs(t *testing.T) {

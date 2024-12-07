@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/discov/internal"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/discov/internal"
 )
 
 var mockLock sync.Mutex

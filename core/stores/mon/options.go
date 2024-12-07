@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/zeromicro/go-zero/core/syncx"
+	"github.com/r27153733/fastgozero/core/syncx"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
 	mopt "go.mongodb.org/mongo-driver/mongo/options"

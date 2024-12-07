@@ -1,9 +1,9 @@
 package handler
 
 import (
+	"github.com/r27153733/fastgozero/core/syncx"
+	"github.com/r27153733/fastgozero/rest/internal"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/syncx"
-	"github.com/zeromicro/go-zero/rest/internal"
 )
 
 // MaxConnsHandler returns a middleware that limit the concurrent connections.

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/pelletier/go-toml/v2"
-	"github.com/zeromicro/go-zero/core/lang"
+	"github.com/r27153733/fastgozero/core/lang"
 	"gopkg.in/yaml.v2"
 )
 

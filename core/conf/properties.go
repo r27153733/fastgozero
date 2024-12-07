@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/zeromicro/go-zero/core/iox"
+	"github.com/r27153733/fastgozero/core/iox"
 )
 
 // PropertyError represents a configuration error message.

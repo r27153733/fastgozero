@@ -14,13 +14,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/r27153733/fastgozero/core/conf"
+	"github.com/r27153733/fastgozero/core/logx/logtest"
+	"github.com/r27153733/fastgozero/rest/chain"
+	"github.com/r27153733/fastgozero/rest/httpx"
+	"github.com/r27153733/fastgozero/rest/internal/cors"
+	"github.com/r27153733/fastgozero/rest/router"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/conf"
-	"github.com/zeromicro/go-zero/core/logx/logtest"
-	"github.com/zeromicro/go-zero/rest/chain"
-	"github.com/zeromicro/go-zero/rest/httpx"
-	"github.com/zeromicro/go-zero/rest/internal/cors"
-	"github.com/zeromicro/go-zero/rest/router"
 )
 
 const (

@@ -3,13 +3,13 @@ package zrpc
 import (
 	"time"
 
-	"github.com/zeromicro/go-zero/core/load"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/stat"
-	"github.com/zeromicro/go-zero/core/stores/redis"
-	"github.com/zeromicro/go-zero/zrpc/internal"
-	"github.com/zeromicro/go-zero/zrpc/internal/auth"
-	"github.com/zeromicro/go-zero/zrpc/internal/serverinterceptors"
+	"github.com/r27153733/fastgozero/core/load"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/core/stat"
+	"github.com/r27153733/fastgozero/core/stores/redis"
+	"github.com/r27153733/fastgozero/zrpc/internal"
+	"github.com/r27153733/fastgozero/zrpc/internal/auth"
+	"github.com/r27153733/fastgozero/zrpc/internal/serverinterceptors"
 	"google.golang.org/grpc"
 )
 

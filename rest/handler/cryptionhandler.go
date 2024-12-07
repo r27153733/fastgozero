@@ -6,9 +6,9 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/r27153733/fastgozero/core/codec"
+	"github.com/r27153733/fastgozero/fastext"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/codec"
-	"github.com/zeromicro/go-zero/fastext"
 )
 
 const maxBytes = 1 << 20 // 1 MiB

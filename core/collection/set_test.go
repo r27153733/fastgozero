@@ -4,8 +4,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/logx"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/logx"
 )
 
 func init() {

@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/load"
+	"github.com/r27153733/fastgozero/core/stat"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/load"
-	"github.com/zeromicro/go-zero/core/stat"
 )
 
 func TestSheddingHandlerAccept(t *testing.T) {

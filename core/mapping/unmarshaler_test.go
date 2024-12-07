@@ -12,8 +12,8 @@ import (
 	"unicode"
 
 	"github.com/google/uuid"
+	"github.com/r27153733/fastgozero/core/stringx"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/stringx"
 )
 
 // because json.Number doesn't support strconv.ParseUint(...),

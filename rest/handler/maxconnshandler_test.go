@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/lang"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/lang"
 )
 
 const conns = 4

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"runtime/debug"
 
+	"github.com/r27153733/fastgozero/rest/internal"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/rest/internal"
 )
 
 // RecoverHandler returns a middleware that recovers if panic happens.

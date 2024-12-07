@@ -2,8 +2,8 @@ package logx
 
 import (
 	"fmt"
-	"github.com/zeromicro/go-zero/fastext"
-	"github.com/zeromicro/go-zero/fastext/fasttime"
+	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/fastext/fasttime"
 	"runtime"
 	"strings"
 	"sync"

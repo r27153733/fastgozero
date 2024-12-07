@@ -1,4 +1,4 @@
-module github.com/zeromicro/go-zero
+module github.com/r27153733/fastgozero
 
 go 1.21
 

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"testing/iotest"
 
+	"github.com/r27153733/fastgozero/core/codec"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttputil"
-	"github.com/zeromicro/go-zero/core/codec"
 )
 
 const (

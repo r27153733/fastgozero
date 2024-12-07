@@ -3,12 +3,12 @@ package handler
 import (
 	"time"
 
+	"github.com/r27153733/fastgozero/core/codec"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/rest/httpx"
+	"github.com/r27153733/fastgozero/rest/internal/security"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/codec"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/fastext"
-	"github.com/zeromicro/go-zero/rest/httpx"
-	"github.com/zeromicro/go-zero/rest/internal/security"
 )
 
 const contentSecurity = "X-Content-Security"

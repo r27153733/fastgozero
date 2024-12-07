@@ -5,16 +5,16 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/r27153733/fastgozero/core/color"
+	"github.com/r27153733/fastgozero/core/logx"
+	"github.com/r27153733/fastgozero/core/syncx"
+	"github.com/r27153733/fastgozero/core/timex"
+	"github.com/r27153733/fastgozero/core/utils"
+	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/rest/httpx"
+	"github.com/r27153733/fastgozero/rest/internal"
 	"github.com/valyala/bytebufferpool"
 	"github.com/valyala/fasthttp"
-	"github.com/zeromicro/go-zero/core/color"
-	"github.com/zeromicro/go-zero/core/logx"
-	"github.com/zeromicro/go-zero/core/syncx"
-	"github.com/zeromicro/go-zero/core/timex"
-	"github.com/zeromicro/go-zero/core/utils"
-	"github.com/zeromicro/go-zero/fastext"
-	"github.com/zeromicro/go-zero/rest/httpx"
-	"github.com/zeromicro/go-zero/rest/internal"
 )
 
 const (

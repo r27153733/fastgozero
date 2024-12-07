@@ -4,8 +4,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/color"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/color"
 )
 
 func TestWithColor(t *testing.T) {

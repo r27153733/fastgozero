@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/zeromicro/go-zero/core/errorx"
+	"github.com/r27153733/fastgozero/core/errorx"
 )
 
 const defaultRetryTimes = 3

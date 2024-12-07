@@ -1,6 +1,6 @@
 package metric
 
-import "github.com/zeromicro/go-zero/core/prometheus"
+import "github.com/r27153733/fastgozero/core/prometheus"
 
 // A VectorOpts is a general configuration.
 type VectorOpts struct {

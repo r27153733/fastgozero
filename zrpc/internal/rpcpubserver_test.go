@@ -3,9 +3,9 @@ package internal
 import (
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/discov"
+	"github.com/r27153733/fastgozero/core/netx"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/discov"
-	"github.com/zeromicro/go-zero/core/netx"
 )
 
 func TestNewRpcPubServer(t *testing.T) {

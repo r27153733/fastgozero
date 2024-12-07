@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/r27153733/fastgozero/core/fs"
+	"github.com/r27153733/fastgozero/core/hash"
 	"github.com/stretchr/testify/assert"
-	"github.com/zeromicro/go-zero/core/fs"
-	"github.com/zeromicro/go-zero/core/hash"
 )
 
 var dupErr conflictKeyError
