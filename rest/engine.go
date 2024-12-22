@@ -231,8 +231,8 @@ func (ng *engine) notFoundHandler(next fasthttp.RequestHandler) fasthttp.Request
 			})
 		}
 
-		h(ctx)
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		h(ctx)
 	}
 }
 
