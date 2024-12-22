@@ -15,7 +15,7 @@ type (
 		MaxConns   bool `json:",default=true"`
 		Breaker    bool `json:",default=true"`
 		Shedding   bool `json:",default=true"`
-		Timeout    bool `json:",default=true"`
+		Timeout    bool `json:",default=false"` // fasthttp timeout handler not support cancel
 		Recover    bool `json:",default=true"`
 		Metrics    bool `json:",default=true"`
 		MaxBytes   bool `json:",default=true"`

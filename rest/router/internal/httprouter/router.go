@@ -349,7 +349,7 @@ func (r *Router) ServeHTTP(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	if r.HandleMethodNotAllowed { // Handle 405
+	if r.HandleMethodNotAllowed && len(r.trees) > 0 { // Handle 405
 		// According to RFC 7231 section 6.5.5, MUST generate an Allow header field in response
 		// containing a list of the target resource's currently supported methods.
 		allowed := make([]string, 0, len(r.trees)-1)

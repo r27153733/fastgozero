@@ -112,8 +112,11 @@ func (s *Server) Routes() []Route {
 //	server.ServeHTTP(w, r)
 //	// verify the response
 func (s *Server) ServeHTTP(ctx *fasthttp.RequestCtx) {
+	defer func() {
+		_ = recover()
+		s.router.ServeHTTP(ctx)
+	}()
 	s.ngin.bindRoutes(s.router)
-	s.router.ServeHTTP(ctx)
 }
 
 // Start starts the Server.
