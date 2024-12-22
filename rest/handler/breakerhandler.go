@@ -2,13 +2,13 @@ package handler
 
 import (
 	"fmt"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"net/http"
 	"strings"
 
 	"github.com/r27153733/fastgozero/core/breaker"
 	"github.com/r27153733/fastgozero/core/logx"
 	"github.com/r27153733/fastgozero/core/stat"
-	"github.com/r27153733/fastgozero/fastext"
 	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/valyala/fasthttp"
 )
@@ -24,7 +24,7 @@ func BreakerHandler(method, path string, metrics *stat.Metrics) func(fasthttp.Re
 			if err != nil {
 				metrics.AddDrop()
 				logx.Errorf("[http] dropped, %s - %s - %s",
-					fastext.B2s(ctx.RequestURI()), httpx.GetRemoteAddr(ctx), fastext.B2s(ctx.UserAgent()))
+					bytesconv.BToS(ctx.RequestURI()), httpx.GetRemoteAddr(ctx), bytesconv.BToS(ctx.UserAgent()))
 				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 				return
 			}

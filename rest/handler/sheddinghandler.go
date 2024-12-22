@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"net/http"
 	"sync"
 
 	"github.com/r27153733/fastgozero/core/load"
 	"github.com/r27153733/fastgozero/core/logx"
 	"github.com/r27153733/fastgozero/core/stat"
-	"github.com/r27153733/fastgozero/fastext"
 	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/valyala/fasthttp"
 )
@@ -37,7 +37,7 @@ func SheddingHandler(shedder load.Shedder, metrics *stat.Metrics) func(fasthttp.
 				metrics.AddDrop()
 				sheddingStat.IncrementDrop()
 				logx.Errorf("[http] dropped, %s - %s - %s",
-					fastext.B2s(ctx.RequestURI()), httpx.GetRemoteAddr(ctx), fastext.B2s(ctx.UserAgent()))
+					bytesconv.BToS(ctx.RequestURI()), httpx.GetRemoteAddr(ctx), bytesconv.BToS(ctx.UserAgent()))
 				ctx.SetStatusCode(http.StatusServiceUnavailable)
 				return
 			}

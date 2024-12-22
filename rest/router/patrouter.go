@@ -1,16 +1,18 @@
+//go:build gozerorouter
+
 package router
 
 import (
 	"errors"
-	"github.com/r27153733/fastgozero/fastext"
-	"github.com/valyala/fasthttp"
 	"net/http"
 	"path"
 	"strings"
 
 	"github.com/r27153733/fastgozero/core/search"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/r27153733/fastgozero/rest/pathvar"
+	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -26,7 +28,7 @@ var (
 )
 
 type patRouter struct {
-	trees      map[string]*search.Tree
+	trees      []*search.Tree
 	notFound   fasthttp.RequestHandler
 	notAllowed fasthttp.RequestHandler
 }
@@ -34,7 +36,7 @@ type patRouter struct {
 // NewRouter returns a httpx.Router.
 func NewRouter() httpx.Router {
 	return &patRouter{
-		trees: make(map[string]*search.Tree),
+		trees: make([]*search.Tree, 9),
 	}
 }
 
@@ -43,24 +45,26 @@ func (pr *patRouter) Handle(method, reqPath string, handler fasthttp.RequestHand
 		return ErrInvalidMethod
 	}
 
+	indexOf := methodIndexOf(method)
+
 	if len(reqPath) == 0 || reqPath[0] != '/' {
 		return ErrInvalidPath
 	}
 
 	cleanPath := path.Clean(reqPath)
-	tree, ok := pr.trees[method]
-	if ok {
+	tree := pr.trees[indexOf]
+	if tree != nil {
 		return tree.Add(cleanPath, handler)
 	}
 
 	tree = search.NewTree()
-	pr.trees[method] = tree
+	pr.trees[indexOf] = tree
 	return tree.Add(cleanPath, handler)
 }
 
 func (pr *patRouter) ServeHTTP(ctx *fasthttp.RequestCtx) {
-	reqPath := path.Clean(fastext.B2s(ctx.Request.URI().Path()))
-	if tree, ok := pr.trees[fastext.B2s(ctx.Method())]; ok {
+	reqPath := path.Clean(bytesconv.BToS(ctx.Request.URI().Path()))
+	if tree := pr.trees[methodIndexOf(bytesconv.BToS(ctx.Method()))]; tree != nil {
 		if result, ok := tree.Search(reqPath); ok {
 			if len(result.Params) > 0 {
 				free := pathvar.SetVars(ctx, result.Params)
@@ -71,7 +75,7 @@ func (pr *patRouter) ServeHTTP(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	allows, ok := pr.methodsAllowed(fastext.B2s(ctx.Method()), reqPath)
+	allows, ok := pr.methodsAllowed(bytesconv.BToS(ctx.Method()), reqPath)
 	if !ok {
 		pr.handleNotFound(ctx)
 		return
@@ -104,14 +108,15 @@ func (pr *patRouter) handleNotFound(ctx *fasthttp.RequestCtx) {
 func (pr *patRouter) methodsAllowed(method, path string) (string, bool) {
 	var allows []string
 
+	idx := methodIndexOf(method)
 	for treeMethod, tree := range pr.trees {
-		if treeMethod == method {
+		if treeMethod == idx || tree == nil {
 			continue
 		}
 
 		_, ok := tree.Search(path)
 		if ok {
-			allows = append(allows, treeMethod)
+			allows = append(allows, methodFromIndex(treeMethod))
 		}
 	}
 
@@ -123,8 +128,58 @@ func (pr *patRouter) methodsAllowed(method, path string) (string, bool) {
 }
 
 func validMethod(method string) bool {
-	return method == http.MethodDelete || method == http.MethodGet ||
-		method == http.MethodHead || method == http.MethodOptions ||
-		method == http.MethodPatch || method == http.MethodPost ||
-		method == http.MethodPut
+	return method == fasthttp.MethodDelete || method == fasthttp.MethodGet ||
+		method == fasthttp.MethodHead || method == fasthttp.MethodOptions ||
+		method == fasthttp.MethodPatch || method == fasthttp.MethodPost ||
+		method == fasthttp.MethodPut
+}
+
+func methodFromIndex(index int) string {
+	switch index {
+	case 0:
+		return fasthttp.MethodGet
+	case 1:
+		return fasthttp.MethodHead
+	case 2:
+		return fasthttp.MethodPost
+	case 3:
+		return fasthttp.MethodPut
+	case 4:
+		return fasthttp.MethodPatch
+	case 5:
+		return fasthttp.MethodDelete
+	case 6:
+		return fasthttp.MethodConnect
+	case 7:
+		return fasthttp.MethodOptions
+	case 8:
+		return fasthttp.MethodTrace
+	default:
+		return ""
+	}
+}
+
+func methodIndexOf(method string) int {
+	switch method {
+	case fasthttp.MethodGet:
+		return 0
+	case fasthttp.MethodHead:
+		return 1
+	case fasthttp.MethodPost:
+		return 2
+	case fasthttp.MethodPut:
+		return 3
+	case fasthttp.MethodPatch:
+		return 4
+	case fasthttp.MethodDelete:
+		return 5
+	case fasthttp.MethodConnect:
+		return 6
+	case fasthttp.MethodOptions:
+		return 7
+	case fasthttp.MethodTrace:
+		return 8
+	default:
+		return -1
+	}
 }

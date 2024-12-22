@@ -3,11 +3,11 @@ package handler
 import (
 	"encoding/base64"
 	"errors"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"io"
 	"net/http"
 
 	"github.com/r27153733/fastgozero/core/codec"
-	"github.com/r27153733/fastgozero/fastext"
 	"github.com/valyala/fasthttp"
 )
 
@@ -64,7 +64,7 @@ func decryptBody(limitBytes int64, key []byte, r *fasthttp.Request) error {
 		return err
 	}
 
-	content, err = base64.StdEncoding.DecodeString(fastext.B2s(content))
+	content, err = base64.StdEncoding.DecodeString(bytesconv.BToS(content))
 	if err != nil {
 		return err
 	}

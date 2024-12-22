@@ -1,9 +1,9 @@
 package handler
 
 import (
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"time"
 
-	"github.com/r27153733/fastgozero/fastext"
 	"github.com/valyala/fasthttp"
 )
 
@@ -27,9 +27,9 @@ func TimeoutHandler(duration time.Duration) func(fasthttp.RequestHandler) fastht
 
 		timeoutFunc := fasthttp.TimeoutWithCodeHandler(next, duration, "Request Timeout", fasthttp.StatusServiceUnavailable)
 		return func(ctx *fasthttp.RequestCtx) {
-			if fastext.B2s(ctx.Request.Header.Peek(headerUpgrade)) == valueWebsocket ||
+			if bytesconv.BToS(ctx.Request.Header.Peek(headerUpgrade)) == valueWebsocket ||
 				// Server-Sent Event ignore timeout.
-				fastext.B2s(ctx.Request.Header.Peek(headerAccept)) == valueSSE {
+				bytesconv.BToS(ctx.Request.Header.Peek(headerAccept)) == valueSSE {
 				next(ctx)
 				return
 			}

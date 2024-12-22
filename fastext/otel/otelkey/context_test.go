@@ -1,4 +1,4 @@
-package fastext
+package otelkey
 
 import (
 	"context"

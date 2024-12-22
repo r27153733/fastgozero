@@ -3,37 +3,53 @@ package httpx
 import (
 	"errors"
 	"github.com/valyala/fasthttp"
-	"mime/multipart"
 )
 
 const xForwardedFor = "X-Forwarded-For"
 
 // GetFormValues returns the form values.
 func GetFormValues(r *fasthttp.Request) (res map[string]any, err error) {
-	var form *multipart.Form
-	if form, err = r.MultipartForm(); err != nil {
+	res = map[string]any{}
+	f := func(key, value []byte) {
+		if len(value) == 0 {
+			return
+		}
+		sk := string(key)
+		sv := string(value)
+		if v := res[sk]; v != nil {
+			arr := v.([]string)
+			res[sk] = append(arr, sv)
+		} else {
+			res[sk] = []string{sv}
+		}
+	}
+	r.PostArgs().VisitAll(f)
+
+	var formMap map[string][]string
+	if form, err := r.MultipartForm(); err != nil {
 		if !errors.Is(err, fasthttp.ErrNoMultipartForm) {
 			return nil, err
-		} else {
-			return make(map[string]any), nil
 		}
+	} else {
+		formMap = form.Value
 	}
 
-	params := make(map[string]any, len(form.Value))
-	for name, values := range form.Value {
-		filtered := make([]string, 0, len(values))
-		for _, v := range values {
-			if len(v) > 0 {
-				filtered = append(filtered, v)
+	for name, values := range formMap {
+		if len(values) > 0 {
+			if v := res[name]; v != nil {
+				arr := v.([]string)
+				arr = append(arr, values...)
+			} else {
+				tmp := make([]string, len(values))
+				copy(tmp, values)
+				res[name] = tmp
 			}
 		}
-
-		if len(filtered) > 0 {
-			params[name] = filtered
-		}
 	}
 
-	return params, nil
+	r.URI().QueryArgs().VisitAll(f)
+
+	return res, nil
 }
 
 // GetRemoteAddr returns the peer address, supports X-Forward-For.

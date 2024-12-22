@@ -5,7 +5,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/r27153733/fastgozero/core/logx"
-	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/fastext/fastctx"
 	"github.com/r27153733/fastgozero/rest/token"
 	"github.com/valyala/fasthttp"
 )
@@ -72,7 +72,7 @@ func Authorize(secret string, opts ...AuthorizeOption) func(fasthttp.RequestHand
 					// ignore the standard claims
 				default:
 					//ctx.SetUserValue(k, v)
-					free := fastext.SetUserValueCtx(ctx, k, v)
+					free := fastctx.SetUserValueCtx(ctx, k, v)
 					defer free()
 				}
 			}

@@ -2,7 +2,7 @@ package logx
 
 import (
 	"fmt"
-	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"github.com/r27153733/fastgozero/fastext/fasttime"
 	"runtime"
 	"strings"
@@ -35,11 +35,11 @@ func getTimestamp() string {
 	} else {
 		t = time.Now()
 	}
-	return fastext.B2s(t.AppendFormat(buf, timeFormat))
+	return bytesconv.BToS(t.AppendFormat(buf, timeFormat))
 }
 
 func releaseTimestamp(timestamp string) {
-	timestampPoll.Put(fastext.S2B(timestamp)[:0])
+	timestampPoll.Put(bytesconv.SToB(timestamp)[:0])
 }
 
 func prettyCaller(file string, line int) string {

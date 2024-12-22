@@ -1,8 +1,8 @@
 package httpx
 
 import (
-	"github.com/r27153733/fastgozero/fastext"
-	"github.com/valyala/fasthttp"
+	"bytes"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"io"
 	"reflect"
 	"strings"
@@ -13,6 +13,7 @@ import (
 	"github.com/r27153733/fastgozero/rest/internal/encoding"
 	"github.com/r27153733/fastgozero/rest/internal/header"
 	"github.com/r27153733/fastgozero/rest/pathvar"
+	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -113,7 +114,13 @@ func ParseHeader(headerValue string) map[string]string {
 // ParseJsonBody parses the post request which contains json in body.
 func ParseJsonBody(r *fasthttp.Request, v any) error {
 	if withJsonBody(r) {
-		reader := io.LimitReader(r.BodyStream(), maxBodyLen)
+		var reader io.Reader
+		if !r.IsBodyStream() {
+			reader = bytes.NewReader(r.Body())
+		} else {
+			reader = io.LimitReader(r.BodyStream(), maxBodyLen)
+		}
+
 		return mapping.UnmarshalJsonReader(reader, v)
 	}
 
@@ -124,12 +131,14 @@ func ParseJsonBody(r *fasthttp.Request, v any) error {
 // Like http://localhost/bag/:name
 func ParsePath(r *fasthttp.RequestCtx, v any) error {
 	vars := pathvar.Vars(r)
-	m := make(map[string]any, len(vars))
-	for k, v := range vars {
-		m[k] = v
-	}
+	return pathUnmarshaler.UnmarshalValuer(mapStr2Str(vars), v)
+}
 
-	return pathUnmarshaler.Unmarshal(m, v)
+type mapStr2Str map[string]string
+
+func (m mapStr2Str) Value(key string) (any, bool) {
+	v, ok := m[key]
+	return v, ok
 }
 
 // SetValidator sets the validator.
@@ -140,5 +149,5 @@ func SetValidator(val Validator) {
 }
 
 func withJsonBody(r *fasthttp.Request) bool {
-	return r.Header.ContentLength() > 0 && strings.Contains(fastext.B2s(r.Header.Peek(header.ContentType)), header.ApplicationJson)
+	return r.Header.ContentLength() > 0 && strings.Contains(bytesconv.BToS(r.Header.Peek(header.ContentType)), header.ApplicationJson)
 }

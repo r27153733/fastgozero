@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"github.com/valyala/bytebufferpool"
 	"io"
 	"log"
@@ -419,7 +419,7 @@ func writeJson(writer io.Writer, info any) {
 	if err != nil {
 		log.Printf("err: %s\n\n%s", err.Error(), debug.Stack())
 	} else if writer == nil {
-		log.Println(fastext.B2s(content.B))
+		log.Println(bytesconv.BToS(content.B))
 	} else {
 		if _, err := writer.Write(append(content.B, '\n')); err != nil {
 			log.Println(err.Error())

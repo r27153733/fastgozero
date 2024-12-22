@@ -1,11 +1,11 @@
 package handler
 
 import (
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"time"
 
 	"github.com/r27153733/fastgozero/core/codec"
 	"github.com/r27153733/fastgozero/core/logx"
-	"github.com/r27153733/fastgozero/fastext"
 	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/r27153733/fastgozero/rest/internal/security"
 	"github.com/valyala/fasthttp"
@@ -31,16 +31,16 @@ func LimitContentSecurityHandler(limitBytes int64, decrypters map[string]codec.R
 
 	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		return func(ctx *fasthttp.RequestCtx) {
-			switch fastext.B2s(ctx.Method()) {
+			switch bytesconv.BToS(ctx.Method()) {
 			case fasthttp.MethodDelete, fasthttp.MethodGet, fasthttp.MethodPost, fasthttp.MethodPut:
-				header, err := security.ParseContentSecurity(decrypters, fastext.B2s(ctx.Request.Header.Peek(httpx.ContentSecurity)))
+				header, err := security.ParseContentSecurity(decrypters, bytesconv.BToS(ctx.Request.Header.Peek(httpx.ContentSecurity)))
 				if err != nil {
 					logx.Errorf("Signature parse failed, X-Content-Security: %s, error: %s",
-						fastext.B2s(ctx.Request.Header.Peek(contentSecurity)), err.Error())
+						bytesconv.BToS(ctx.Request.Header.Peek(contentSecurity)), err.Error())
 					executeCallbacks(ctx, next, strict, httpx.CodeSignatureInvalidHeader, callbacks)
 				} else if code := security.VerifySignature(&ctx.Request, header, tolerance); code != httpx.CodeSignaturePass {
 					logx.Errorf("Signature verification failed, X-Content-Security: %s",
-						fastext.B2s(ctx.Request.Header.Peek(contentSecurity)))
+						bytesconv.BToS(ctx.Request.Header.Peek(contentSecurity)))
 					executeCallbacks(ctx, next, strict, code, callbacks)
 				} else if ctx.Request.Header.ContentLength() > 0 && header.Encrypted() {
 					LimitCryptionHandler(limitBytes, header.Key)(next)(ctx)

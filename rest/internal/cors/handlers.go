@@ -1,7 +1,7 @@
 package cors
 
 import (
-	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"github.com/valyala/fasthttp"
 	"net/http"
 	"strings"
@@ -74,7 +74,7 @@ func checkAndSetHeaders(ctx *fasthttp.RequestCtx, origins []string) {
 		return
 	}
 
-	origin := fastext.B2s(ctx.Request.Header.Peek(originHeader))
+	origin := bytesconv.BToS(ctx.Request.Header.Peek(originHeader))
 	if isOriginAllowed(origins, origin) {
 		setHeader(&ctx.Response, origin)
 	}

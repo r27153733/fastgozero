@@ -1,7 +1,7 @@
 package logx
 
 import (
-	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"log"
 )
 
@@ -20,6 +20,6 @@ func (lw logWriter) Close() error {
 }
 
 func (lw logWriter) Write(data []byte) (int, error) {
-	lw.logger.Print(fastext.B2s(data))
+	lw.logger.Print(bytesconv.BToS(data))
 	return len(data), nil
 }

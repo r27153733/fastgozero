@@ -1,7 +1,7 @@
 package fileserver
 
 import (
-	"github.com/r27153733/fastgozero/fastext"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"github.com/valyala/fasthttp"
 	"io/fs"
 	"strings"
@@ -16,7 +16,7 @@ func Middleware(path string, fs fs.FS) func(fasthttp.RequestHandler) fasthttp.Re
 	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		return func(ctx *fasthttp.RequestCtx) {
 			if canServe(&ctx.Request) {
-				fasthttp.ServeFS(ctx, fs, fastext.B2s(ctx.URI().Path()[len(pathWithoutTrailSlash):]))
+				fasthttp.ServeFS(ctx, fs, bytesconv.BToS(ctx.URI().Path()[len(pathWithoutTrailSlash):]))
 			} else {
 				next(ctx)
 			}
@@ -57,8 +57,8 @@ func createServeChecker(path string, fs fs.FS) func(r *fasthttp.Request) bool {
 
 	return func(r *fasthttp.Request) bool {
 		return r.Header.IsGet() &&
-			strings.HasPrefix(fastext.B2s(r.URI().Path()), pathWithTrailSlash) &&
-			fileChecker(fastext.B2s(r.URI().Path()[len(pathWithTrailSlash):]))
+			strings.HasPrefix(bytesconv.BToS(r.URI().Path()), pathWithTrailSlash) &&
+			fileChecker(bytesconv.BToS(r.URI().Path()[len(pathWithTrailSlash):]))
 	}
 }
 

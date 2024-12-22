@@ -1,10 +1,9 @@
-package fastext
+package otelkey
 
 import (
 	"context"
 	"unsafe"
 
-	"github.com/valyala/fasthttp"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -39,19 +38,4 @@ func getCtxKeyValue(ctx context.Context) *valueCtx {
 	ictx := *(*iface)(unsafe.Pointer(&ctx))
 	valCtx := (*valueCtx)(ictx.data)
 	return valCtx
-}
-
-func SetUserValueCtx(ctx *fasthttp.RequestCtx, key, val any) (free func()) {
-	value := ctx.UserValue(key)
-	if value == nil {
-		free = func() {
-			ctx.RemoveUserValue(key)
-		}
-	} else {
-		free = func() {
-			ctx.SetUserValue(key, value)
-		}
-	}
-	ctx.SetUserValue(key, val)
-	return free
 }

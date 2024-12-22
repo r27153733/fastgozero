@@ -1,11 +1,12 @@
 package handler
 
 import (
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
+	"github.com/r27153733/fastgozero/fastext/otel/otelkey"
 	"strings"
 
 	"github.com/r27153733/fastgozero/core/collection"
 	"github.com/r27153733/fastgozero/core/trace"
-	"github.com/r27153733/fastgozero/fastext"
 	"github.com/r27153733/fastgozero/fastext/otel/propagation"
 	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/valyala/fasthttp"
@@ -26,7 +27,7 @@ type (
 )
 
 var (
-	defaultTracerCtxKeys = []any{fastext.CurrentSpanKey, fastext.BaggageKey}
+	defaultTracerCtxKeys = []any{otelkey.CurrentSpanKey, otelkey.BaggageKey}
 )
 
 // TraceHandler return a middleware that process the opentelemetry.
@@ -88,7 +89,7 @@ func TraceHandler(serviceName, path string, opts ...TraceOption) func(handler fa
 				attrs = append(attrs, attribute.String("http.host", string(ctx.Request.URI().Host())))
 			}
 			flavor := ""
-			if fastext.B2s(ctx.Request.Header.Protocol()) == "HTTP/2" {
+			if bytesconv.BToS(ctx.Request.Header.Protocol()) == "HTTP/2" {
 				flavor = "2"
 			} else {
 				flavor = "1.1"

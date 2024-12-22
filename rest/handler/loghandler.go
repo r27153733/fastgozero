@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bufio"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"strconv"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/r27153733/fastgozero/core/syncx"
 	"github.com/r27153733/fastgozero/core/timex"
 	"github.com/r27153733/fastgozero/core/utils"
-	"github.com/r27153733/fastgozero/fastext"
 	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/r27153733/fastgozero/rest/internal"
 	"github.com/valyala/bytebufferpool"
@@ -83,7 +83,7 @@ func logBrief(r *fasthttp.RequestCtx, timer *utils.ElapsedTimer, logs *internal.
 	buf.B = append(buf.B, "[HTTP] "...)
 	buf.B = append(buf.B, wrapStatusCode(code)...)
 	buf.B = append(buf.B, " - "...)
-	buf.B = append(buf.B, wrapMethod(fastext.B2s(r.Method()))...)
+	buf.B = append(buf.B, wrapMethod(bytesconv.BToS(r.Method()))...)
 	buf.B = append(buf.B, " "...)
 	buf.B = append(buf.B, r.RequestURI()...)
 	buf.B = append(buf.B, " - "...)
@@ -92,7 +92,7 @@ func logBrief(r *fasthttp.RequestCtx, timer *utils.ElapsedTimer, logs *internal.
 	buf.B = append(buf.B, r.UserAgent()...)
 
 	if duration > slowThreshold.Load() {
-		logger.Slowf("%s - slowcall(%s)", fastext.B2s(buf.B), timex.ReprOfDuration(duration))
+		logger.Slowf("%s - slowcall(%s)", bytesconv.BToS(buf.B), timex.ReprOfDuration(duration))
 	}
 
 	if !ok {
@@ -146,7 +146,7 @@ func logDetails(ctx *fasthttp.RequestCtx, timer *utils.ElapsedTimer,
 		}
 		buf.B = append(buf.B, '\n')
 
-		logger.Slow(fastext.B2s(buf.B))
+		logger.Slow(bytesconv.BToS(buf.B))
 
 		copy(buf.B[l:], timeStr)
 		l = l + len(timeStr)
