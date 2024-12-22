@@ -2,17 +2,16 @@ package httpc
 
 import (
 	"bytes"
-	"io"
-	"net/http"
-	"strings"
-
 	"github.com/r27153733/fastgozero/core/mapping"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"github.com/r27153733/fastgozero/rest/internal/encoding"
 	"github.com/r27153733/fastgozero/rest/internal/header"
+	"github.com/valyala/fasthttp"
+	"io"
 )
 
 // Parse parses the response.
-func Parse(resp *http.Response, val any) error {
+func Parse(resp *fasthttp.Response, val any) error {
 	if err := ParseHeaders(resp, val); err != nil {
 		return err
 	}
@@ -21,21 +20,19 @@ func Parse(resp *http.Response, val any) error {
 }
 
 // ParseHeaders parses the response headers.
-func ParseHeaders(resp *http.Response, val any) error {
-	return encoding.ParseHeaders(resp.Header, val)
+func ParseHeaders(resp *fasthttp.Response, val any) error {
+	return encoding.ParseRespHeaders(&resp.Header, val)
 }
 
 // ParseJsonBody parses the response body, which should be in json content type.
-func ParseJsonBody(resp *http.Response, val any) error {
-	defer resp.Body.Close()
-
+func ParseJsonBody(resp *fasthttp.Response, val any) error {
 	if isContentTypeJson(resp) {
-		if resp.ContentLength > 0 {
-			return mapping.UnmarshalJsonReader(resp.Body, val)
+		if resp.Header.ContentLength() > 0 {
+			return mapping.UnmarshalJsonReader(bytes.NewReader(resp.Body()), val)
 		}
 
 		var buf bytes.Buffer
-		if _, err := io.Copy(&buf, resp.Body); err != nil {
+		if _, err := io.Copy(&buf, bytes.NewReader(resp.Body())); err != nil {
 			return err
 		}
 
@@ -47,6 +44,6 @@ func ParseJsonBody(resp *http.Response, val any) error {
 	return mapping.UnmarshalJsonMap(nil, val)
 }
 
-func isContentTypeJson(r *http.Response) bool {
-	return strings.Contains(r.Header.Get(header.ContentType), header.ApplicationJson)
+func isContentTypeJson(r *fasthttp.Response) bool {
+	return bytes.Contains(r.Header.Peek(header.ContentType), bytesconv.SToB(header.ApplicationJson))
 }

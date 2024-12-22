@@ -12,7 +12,7 @@ func Vars(r *fasthttp.RequestCtx) Params {
 		return vars
 	}
 
-	return nil
+	return EmptyParams{}
 }
 
 // SetVars writes params into given r.

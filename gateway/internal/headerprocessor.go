@@ -2,7 +2,8 @@ package internal
 
 import (
 	"fmt"
-	"net/http"
+	"github.com/r27153733/fastgozero/fastext/bytesconv"
+	"github.com/valyala/fasthttp"
 	"strings"
 )
 
@@ -12,19 +13,18 @@ const (
 )
 
 // ProcessHeaders builds the headers for the gateway from HTTP headers.
-func ProcessHeaders(header http.Header) []string {
+func ProcessHeaders(header *fasthttp.RequestHeader) []string {
 	var headers []string
 
-	for k, v := range header {
-		if !strings.HasPrefix(k, metadataHeaderPrefix) {
-			continue
+	header.VisitAll(func(k []byte, v []byte) {
+		sk := bytesconv.BToS(k)
+		if !strings.HasPrefix(sk, metadataHeaderPrefix) {
+			return
 		}
 
-		key := fmt.Sprintf("%s%s", metadataPrefix, strings.TrimPrefix(k, metadataHeaderPrefix))
-		for _, vv := range v {
-			headers = append(headers, key+":"+vv)
-		}
-	}
+		key := fmt.Sprintf("%s%s", metadataPrefix, strings.TrimPrefix(sk, metadataHeaderPrefix))
+		headers = append(headers, key+":"+string(v))
+	})
 
 	return headers
 }

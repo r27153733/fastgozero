@@ -1,8 +1,7 @@
 package internal
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"github.com/valyala/fasthttp"
 	"testing"
 	"time"
 
@@ -10,14 +9,18 @@ import (
 )
 
 func TestGetTimeout(t *testing.T) {
-	req := httptest.NewRequest("GET", "/", http.NoBody)
-	req.Header.Set(grpcTimeoutHeader, "1s")
-	timeout := GetTimeout(req.Header, time.Second*5)
+	req := new(fasthttp.RequestCtx)
+	req.Request.Header.SetMethod(fasthttp.MethodGet)
+
+	req.Request.Header.Set(grpcTimeoutHeader, "1s")
+	timeout := GetTimeout(&req.Request.Header, time.Second*5)
 	assert.Equal(t, time.Second, timeout)
 }
 
 func TestGetTimeoutDefault(t *testing.T) {
-	req := httptest.NewRequest("GET", "/", http.NoBody)
-	timeout := GetTimeout(req.Header, time.Second*5)
+	req := new(fasthttp.RequestCtx)
+	req.Request.Header.SetMethod(fasthttp.MethodGet)
+
+	timeout := GetTimeout(&req.Request.Header, time.Second*5)
 	assert.Equal(t, time.Second*5, timeout)
 }

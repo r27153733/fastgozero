@@ -131,7 +131,7 @@ func TestPatRouter(t *testing.T) {
 			assert.Nil(t, err)
 			err = router.Handle(test.method, "/a/b/c", func(ctx *fasthttp.RequestCtx) {
 				routed = true
-				assert.Nil(t, pathvar.Vars(ctx))
+				assert.Equal(t, 0, pathvar.Vars(ctx).Len())
 			})
 			assert.Nil(t, err)
 			err = router.Handle(test.method, "/b/c", func(ctx *fasthttp.RequestCtx) {

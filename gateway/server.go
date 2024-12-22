@@ -3,7 +3,7 @@ package gateway
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"github.com/valyala/fasthttp"
 	"strings"
 
 	"github.com/fullstorydev/grpcurl"
@@ -23,7 +23,7 @@ type (
 	Server struct {
 		*rest.Server
 		upstreams     []Upstream
-		processHeader func(http.Header) []string
+		processHeader func(header *fasthttp.RequestHeader) []string
 		dialer        func(conf zrpc.RpcClientConf) zrpc.Client
 	}
 
@@ -119,24 +119,24 @@ func (s *Server) build() error {
 }
 
 func (s *Server) buildHandler(source grpcurl.DescriptorSource, resolver jsonpb.AnyResolver,
-	cli zrpc.Client, rpcPath string) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+	cli zrpc.Client, rpcPath string) func(ctx *fasthttp.RequestCtx) {
+	return func(r *fasthttp.RequestCtx) {
 		parser, err := internal.NewRequestParser(r, resolver)
 		if err != nil {
-			httpx.ErrorCtx(r.Context(), w, err)
+			httpx.ErrorCtx(r, err)
 			return
 		}
 
-		w.Header().Set(httpx.ContentType, httpx.JsonContentType)
-		handler := internal.NewEventHandler(w, resolver)
-		if err := grpcurl.InvokeRPC(r.Context(), source, cli.Conn(), rpcPath, s.prepareMetadata(r.Header),
+		r.Response.Header.Set(httpx.ContentType, httpx.JsonContentType)
+		handler := internal.NewEventHandler(r.Response.BodyWriter(), resolver)
+		if err := grpcurl.InvokeRPC(r, source, cli.Conn(), rpcPath, s.prepareMetadata(&r.Request.Header),
 			handler, parser.Next); err != nil {
-			httpx.ErrorCtx(r.Context(), w, err)
+			httpx.ErrorCtx(r, err)
 		}
 
 		st := handler.Status
 		if st.Code() != codes.OK {
-			httpx.ErrorCtx(r.Context(), w, st.Err())
+			httpx.ErrorCtx(r, st.Err())
 		}
 	}
 }
@@ -171,7 +171,7 @@ func (s *Server) ensureUpstreamNames() error {
 	return nil
 }
 
-func (s *Server) prepareMetadata(header http.Header) []string {
+func (s *Server) prepareMetadata(header *fasthttp.RequestHeader) []string {
 	vals := internal.ProcessHeaders(header)
 	if s.processHeader != nil {
 		vals = append(vals, s.processHeader(header)...)
@@ -182,7 +182,7 @@ func (s *Server) prepareMetadata(header http.Header) []string {
 
 // WithHeaderProcessor sets a processor to process request headers.
 // The returned headers are used as metadata to invoke the RPC.
-func WithHeaderProcessor(processHeader func(http.Header) []string) func(*Server) {
+func WithHeaderProcessor(processHeader func(header *fasthttp.RequestHeader) []string) func(*Server) {
 	return func(s *Server) {
 		s.processHeader = processHeader
 	}

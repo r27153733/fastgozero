@@ -4,27 +4,28 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"net/http"
 
 	"github.com/fullstorydev/grpcurl"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/r27153733/fastgozero/rest/httpx"
 	"github.com/r27153733/fastgozero/rest/router/pathvar"
+	"github.com/valyala/fasthttp"
 )
 
 // NewRequestParser creates a new request parser from the given http.Request and resolver.
-func NewRequestParser(r *http.Request, resolver jsonpb.AnyResolver) (grpcurl.RequestParser, error) {
+func NewRequestParser(r *fasthttp.RequestCtx, resolver jsonpb.AnyResolver) (grpcurl.RequestParser, error) {
 	vars := pathvar.Vars(r)
-	params, err := httpx.GetFormValues(r)
+
+	params, err := httpx.GetFormValues(&r.Request)
 	if err != nil {
 		return nil, err
 	}
 
-	for k, v := range vars {
+	vars.VisitAll(func(k, v string) {
 		params[k] = v
-	}
+	})
 
-	body, ok := getBody(r)
+	body, ok := getBody(&r.Request)
 	if !ok {
 		return buildJsonRequestParser(params, resolver)
 	}
@@ -55,27 +56,14 @@ func buildJsonRequestParser(m map[string]any, resolver jsonpb.AnyResolver) (
 	return grpcurl.NewJSONRequestParser(&buf, resolver), nil
 }
 
-func getBody(r *http.Request) (io.Reader, bool) {
-	if r.Body == nil {
+func getBody(r *fasthttp.Request) (io.Reader, bool) {
+	if r.Header.ContentLength() == 0 {
 		return nil, false
 	}
 
-	if r.ContentLength == 0 {
-		return nil, false
+	if !r.IsBodyStream() {
+		return bytes.NewReader(r.Body()), true
+	} else {
+		return r.BodyStream(), true
 	}
-
-	if r.ContentLength > 0 {
-		return r.Body, true
-	}
-
-	var buf bytes.Buffer
-	if _, err := io.Copy(&buf, r.Body); err != nil {
-		return nil, false
-	}
-
-	if buf.Len() > 0 {
-		return &buf, true
-	}
-
-	return nil, false
 }

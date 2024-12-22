@@ -25,10 +25,10 @@ func TestVars(t *testing.T) {
 		assert.Equal(t, v, get)
 	}
 	free()
-	assert.Nil(t, Vars(&r))
+	assert.Equal(t, 0, Vars(&r).Len())
 }
 
 func TestVarsNil(t *testing.T) {
 	r := fasthttp.RequestCtx{}
-	assert.Nil(t, Vars(&r))
+	assert.Equal(t, 0, Vars(&r).Len())
 }

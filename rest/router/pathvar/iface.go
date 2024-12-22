@@ -6,6 +6,20 @@ type Params interface {
 	Len() int
 }
 
+type EmptyParams struct{}
+
+func (m EmptyParams) Get(key string) (string, bool) {
+	return "", false
+}
+
+func (m EmptyParams) VisitAll(_ func(key, value string)) {
+	return
+}
+
+func (m EmptyParams) Len() int {
+	return 0
+}
+
 type MapParams map[string]string
 
 func (m MapParams) Get(key string) (string, bool) {
