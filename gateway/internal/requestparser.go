@@ -9,7 +9,7 @@ import (
 	"github.com/fullstorydev/grpcurl"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/r27153733/fastgozero/rest/httpx"
-	"github.com/r27153733/fastgozero/rest/pathvar"
+	"github.com/r27153733/fastgozero/rest/router/pathvar"
 )
 
 // NewRequestParser creates a new request parser from the given http.Request and resolver.

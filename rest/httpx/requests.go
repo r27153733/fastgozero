@@ -12,7 +12,7 @@ import (
 	"github.com/r27153733/fastgozero/core/validation"
 	"github.com/r27153733/fastgozero/rest/internal/encoding"
 	"github.com/r27153733/fastgozero/rest/internal/header"
-	"github.com/r27153733/fastgozero/rest/pathvar"
+	"github.com/r27153733/fastgozero/rest/router/pathvar"
 	"github.com/valyala/fasthttp"
 )
 
@@ -131,7 +131,7 @@ func ParseJsonBody(r *fasthttp.Request, v any) error {
 // Like http://localhost/bag/:name
 func ParsePath(r *fasthttp.RequestCtx, v any) error {
 	vars := pathvar.Vars(r)
-	return pathUnmarshaler.UnmarshalValuer(mapStr2Str(vars), v)
+	return pathUnmarshaler.UnmarshalValuer(vars, v)
 }
 
 type mapStr2Str map[string]string

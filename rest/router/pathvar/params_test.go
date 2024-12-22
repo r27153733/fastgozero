@@ -1,7 +1,6 @@
 package pathvar
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,13 +8,22 @@ import (
 )
 
 func TestVars(t *testing.T) {
-	expect := map[string]string{
+	expect := MapParams(map[string]string{
 		"a": "1",
 		"b": "2",
-	}
+	})
 	r := fasthttp.RequestCtx{}
 	free := SetVars(&r, expect)
-	assert.EqualValues(t, expect, Vars(&r))
+	vars := Vars(&r)
+	vars.VisitAll(func(key, value string) {
+		v, _ := expect[key]
+		assert.Equal(t, v, value)
+	})
+	for k, v := range expect {
+		get, ok := vars.Get(k)
+		assert.True(t, ok)
+		assert.Equal(t, v, get)
+	}
 	free()
 	assert.Nil(t, Vars(&r))
 }
@@ -23,9 +31,4 @@ func TestVars(t *testing.T) {
 func TestVarsNil(t *testing.T) {
 	r := fasthttp.RequestCtx{}
 	assert.Nil(t, Vars(&r))
-}
-
-func TestContextKey(t *testing.T) {
-	ck := contextKey("hello")
-	assert.True(t, strings.Contains(ck.String(), "hello"))
 }

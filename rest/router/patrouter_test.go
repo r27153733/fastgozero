@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/r27153733/fastgozero/rest/httpx"
-	"github.com/r27153733/fastgozero/rest/pathvar"
+	"github.com/r27153733/fastgozero/rest/router/pathvar"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
 )
@@ -126,7 +126,7 @@ func TestPatRouter(t *testing.T) {
 			// Register routes
 			err := router.Handle(test.method, "/a/:b", func(ctx *fasthttp.RequestCtx) {
 				routed = true
-				assert.Equal(t, 1, len(pathvar.Vars(ctx)))
+				assert.Equal(t, 1, pathvar.Vars(ctx).Len())
 			})
 			assert.Nil(t, err)
 			err = router.Handle(test.method, "/a/b/c", func(ctx *fasthttp.RequestCtx) {

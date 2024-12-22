@@ -26,6 +26,20 @@ type Param struct {
 // It is therefore safe to read values by the index.
 type Params []Param
 
+func (ps Params) VisitAll(f func(key, value string)) {
+	for i := 0; i < len(ps); i++ {
+		f(ps[i].Key, ps[i].Value)
+	}
+}
+
+func (ps Params) Value(name string) (any, bool) {
+	return ps.Get(name)
+}
+
+func (ps Params) Len() int {
+	return len(ps)
+}
+
 // Get returns the value of the first Param which key matches the given name and a boolean true.
 // If no matching Param is found, an empty string is returned and a boolean false .
 func (ps Params) Get(name string) (string, bool) {
@@ -311,8 +325,9 @@ func (r *Router) ServeHTTP(ctx *fasthttp.RequestCtx) {
 
 		if value := root.getValue(path, ps, skippedNodes, false); value.handler != nil {
 			if ps != nil && value.params != nil {
+				//_ = pathvar.SetVars(ctx, value.params)
 				ctx.SetUserValue(ParamsKey, value.params)
-				defer ctx.RemoveUserValue(ParamsKey)
+				//defer ctx.RemoveUserValue(ParamsKey)
 			}
 			value.handler(ctx)
 

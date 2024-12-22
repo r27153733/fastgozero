@@ -4,7 +4,7 @@ package router
 
 import (
 	"github.com/r27153733/fastgozero/rest/httpx"
-	"github.com/r27153733/fastgozero/rest/router/httprouter"
+	"github.com/r27153733/fastgozero/rest/router/internal/httprouter"
 )
 
 var (
