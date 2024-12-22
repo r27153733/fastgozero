@@ -32,10 +32,6 @@ func (ps Params) VisitAll(f func(key, value string)) {
 	}
 }
 
-func (ps Params) Value(name string) (any, bool) {
-	return ps.Get(name)
-}
-
 func (ps Params) Len() int {
 	return len(ps)
 }

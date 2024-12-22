@@ -131,13 +131,16 @@ func ParseJsonBody(r *fasthttp.Request, v any) error {
 // Like http://localhost/bag/:name
 func ParsePath(r *fasthttp.RequestCtx, v any) error {
 	vars := pathvar.Vars(r)
-	return pathUnmarshaler.UnmarshalValuer(vars, v)
+	if vars == nil {
+		return nil
+	}
+	return pathUnmarshaler.UnmarshalValuer(Str2StrValue(vars.Get), v)
 }
 
-type mapStr2Str map[string]string
+type Str2StrValue func(string) (string, bool)
 
-func (m mapStr2Str) Value(key string) (any, bool) {
-	v, ok := m[key]
+func (f Str2StrValue) Value(key string) (any, bool) {
+	v, ok := f(key)
 	return v, ok
 }
 

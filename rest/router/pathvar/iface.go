@@ -3,7 +3,6 @@ package pathvar
 type Params interface {
 	Get(string) (string, bool)
 	VisitAll(f func(key, value string))
-	Value(key string) (any, bool)
 	Len() int
 }
 
@@ -18,11 +17,6 @@ func (m MapParams) VisitAll(f func(key, value string)) {
 	for k, v := range m {
 		f(k, v)
 	}
-}
-
-func (m MapParams) Value(key string) (any, bool) {
-	v, ok := m[key]
-	return v, ok
 }
 
 func (m MapParams) Len() int {
