@@ -2,8 +2,7 @@ package internal
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
+	"github.com/valyala/fasthttp"
 	"strings"
 	"testing"
 
@@ -13,10 +12,13 @@ import (
 
 func TestInfo(t *testing.T) {
 	collector := new(LogCollector)
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	req = req.WithContext(SetLogCollector(req.Context(), collector))
-	Info(req, "first")
-	Infof(req, "second %s", "third")
+	ctx := new(fasthttp.RequestCtx)
+	ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+	ctx.Request.SetRequestURI("http://localhost")
+	SetLogCollector(ctx, collector)
+
+	Info(ctx, "first")
+	Infof(ctx, "second %s", "third")
 	val := collector.Flush()
 	assert.True(t, strings.Contains(val, "first"))
 	assert.True(t, strings.Contains(val, "second"))
@@ -26,9 +28,11 @@ func TestInfo(t *testing.T) {
 
 func TestError(t *testing.T) {
 	c := logtest.NewCollector(t)
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
-	Error(req, "first")
-	Errorf(req, "second %s", "third")
+	ctx := new(fasthttp.RequestCtx)
+	ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+	ctx.Request.SetRequestURI("http://localhost")
+	Error(ctx, "first")
+	Errorf(ctx, "second %s", "third")
 	val := c.String()
 	assert.True(t, strings.Contains(val, "first"))
 	assert.True(t, strings.Contains(val, "second"))
@@ -39,6 +43,6 @@ func TestLogCollectorContext(t *testing.T) {
 	ctx := context.Background()
 	assert.Nil(t, LogCollectorFromContext(ctx))
 	collector := new(LogCollector)
-	ctx = SetLogCollector(ctx, collector)
+	ctx = context.WithValue(ctx, logContextKey, collector)
 	assert.Equal(t, collector, LogCollectorFromContext(ctx))
 }

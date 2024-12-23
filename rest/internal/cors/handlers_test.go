@@ -2,11 +2,11 @@ package cors
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
 )
 
 func TestAddAllowHeaders(t *testing.T) {
@@ -44,7 +44,7 @@ func TestAddAllowHeaders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			header := http.Header{}
+			header := &fasthttp.ResponseHeader{}
 			headers := make(map[string]struct{})
 			if tt.initial != "" {
 				header.Set(allowHeaders, tt.initial)
@@ -58,9 +58,9 @@ func TestAddAllowHeaders(t *testing.T) {
 			}
 			AddAllowHeaders(header, tt.headers...)
 			var actual []string
-			vals := header.Values(allowHeaders)
+			vals := header.PeekAll(allowHeaders)
 			for _, v := range vals {
-				bunch := strings.Split(v, ", ")
+				bunch := strings.Split(string(v), ", ")
 				for _, b := range bunch {
 					if len(b) > 0 {
 						actual = append(actual, b)
@@ -139,33 +139,39 @@ func TestCorsHandlerWithOrigins(t *testing.T) {
 		for _, method := range methods {
 			test := test
 			t.Run(test.name+"-handler", func(t *testing.T) {
-				r := httptest.NewRequest(method, "http://localhost", http.NoBody)
+				ctx := new(fasthttp.RequestCtx)
+				ctx.Request.Header.SetMethod(method)
+				ctx.Request.SetRequestURI("http://localhost")
+				r := &ctx.Request
 				r.Header.Set(originHeader, test.reqOrigin)
-				w := httptest.NewRecorder()
+
 				handler := NotAllowedHandler(nil, test.origins...)
-				handler.ServeHTTP(w, r)
+				handler(ctx)
 				if method == http.MethodOptions {
-					assert.Equal(t, http.StatusNoContent, w.Result().StatusCode)
+					assert.Equal(t, http.StatusNoContent, ctx.Response.StatusCode())
 				} else {
-					assert.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+					assert.Equal(t, http.StatusNotFound, ctx.Response.StatusCode())
 				}
-				assert.Equal(t, test.expect, w.Header().Get(allowOrigin))
+				assert.Equal(t, test.expect, string(ctx.Response.Header.Peek(allowOrigin)))
 			})
 			t.Run(test.name+"-handler-custom", func(t *testing.T) {
-				r := httptest.NewRequest(method, "http://localhost", http.NoBody)
+				ctx := new(fasthttp.RequestCtx)
+				ctx.Request.Header.SetMethod(method)
+				ctx.Request.SetRequestURI("http://localhost")
+				r := &ctx.Request
 				r.Header.Set(originHeader, test.reqOrigin)
-				w := httptest.NewRecorder()
-				handler := NotAllowedHandler(func(w http.ResponseWriter) {
-					w.Header().Set("foo", "bar")
+
+				handler := NotAllowedHandler(func(w *fasthttp.Response) {
+					w.Header.Set("foo", "bar")
 				}, test.origins...)
-				handler.ServeHTTP(w, r)
+				handler(ctx)
 				if method == http.MethodOptions {
-					assert.Equal(t, http.StatusNoContent, w.Result().StatusCode)
+					assert.Equal(t, http.StatusNoContent, ctx.Response.StatusCode())
 				} else {
-					assert.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+					assert.Equal(t, http.StatusNotFound, ctx.Response.StatusCode())
 				}
-				assert.Equal(t, test.expect, w.Header().Get(allowOrigin))
-				assert.Equal(t, "bar", w.Header().Get("foo"))
+				assert.Equal(t, test.expect, string(ctx.Response.Header.Peek(allowOrigin)))
+				assert.Equal(t, "bar", string(ctx.Response.Header.Peek("foo")))
 			})
 		}
 	}
@@ -174,37 +180,43 @@ func TestCorsHandlerWithOrigins(t *testing.T) {
 		for _, method := range methods {
 			test := test
 			t.Run(test.name+"-middleware", func(t *testing.T) {
-				r := httptest.NewRequest(method, "http://localhost", http.NoBody)
+				ctx := new(fasthttp.RequestCtx)
+				ctx.Request.Header.SetMethod(method)
+				ctx.Request.SetRequestURI("http://localhost")
+				r := &ctx.Request
 				r.Header.Set(originHeader, test.reqOrigin)
-				w := httptest.NewRecorder()
-				handler := Middleware(nil, test.origins...)(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusOK)
+
+				handler := Middleware(nil, test.origins...)(func(ctx *fasthttp.RequestCtx) {
+					ctx.SetStatusCode(http.StatusOK)
 				})
-				handler.ServeHTTP(w, r)
+				handler(ctx)
 				if method == http.MethodOptions {
-					assert.Equal(t, http.StatusNoContent, w.Result().StatusCode)
+					assert.Equal(t, http.StatusNoContent, ctx.Response.StatusCode())
 				} else {
-					assert.Equal(t, http.StatusOK, w.Result().StatusCode)
+					assert.Equal(t, http.StatusOK, ctx.Response.StatusCode())
 				}
-				assert.Equal(t, test.expect, w.Header().Get(allowOrigin))
+				assert.Equal(t, test.expect, string(ctx.Response.Header.Peek(allowOrigin)))
 			})
 			t.Run(test.name+"-middleware-custom", func(t *testing.T) {
-				r := httptest.NewRequest(method, "http://localhost", http.NoBody)
+				ctx := new(fasthttp.RequestCtx)
+				ctx.Request.Header.SetMethod(method)
+				ctx.Request.SetRequestURI("http://localhost")
+				r := &ctx.Request
 				r.Header.Set(originHeader, test.reqOrigin)
-				w := httptest.NewRecorder()
-				handler := Middleware(func(header http.Header) {
+
+				handler := Middleware(func(header *fasthttp.ResponseHeader) {
 					header.Set("foo", "bar")
-				}, test.origins...)(func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(http.StatusOK)
+				}, test.origins...)(func(ctx *fasthttp.RequestCtx) {
+					ctx.SetStatusCode(http.StatusOK)
 				})
-				handler.ServeHTTP(w, r)
+				handler(ctx)
 				if method == http.MethodOptions {
-					assert.Equal(t, http.StatusNoContent, w.Result().StatusCode)
+					assert.Equal(t, http.StatusNoContent, ctx.Response.StatusCode())
 				} else {
-					assert.Equal(t, http.StatusOK, w.Result().StatusCode)
+					assert.Equal(t, http.StatusOK, ctx.Response.StatusCode())
 				}
-				assert.Equal(t, test.expect, w.Header().Get(allowOrigin))
-				assert.Equal(t, "bar", w.Header().Get("foo"))
+				assert.Equal(t, test.expect, string(ctx.Response.Header.Peek(allowOrigin)))
+				assert.Equal(t, "bar", string(ctx.Response.Header.Peek("foo")))
 			})
 		}
 	}

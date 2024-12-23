@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"github.com/valyala/fasthttp"
 	"io"
 	"log"
 	"net/http"
@@ -96,9 +97,11 @@ func TestContentSecurity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			r, err := http.NewRequest(http.MethodPost, "http://localhost:3333/a/b?c=first&d=second",
-				strings.NewReader(body))
-			assert.Nil(t, err)
+			ctx := new(fasthttp.RequestCtx)
+			ctx.Request.Header.SetMethod(fasthttp.MethodPost)
+			ctx.Request.SetRequestURI("http://localhost:3333/a/b?c=first&d=second")
+			ctx.Request.SetBody([]byte(body))
+			r := &ctx.Request
 
 			timestamp := time.Now().Unix()
 			sha := sha256.New()
@@ -107,8 +110,8 @@ func TestContentSecurity(t *testing.T) {
 			contentOfSign := strings.Join([]string{
 				strconv.FormatInt(timestamp, 10),
 				http.MethodPost,
-				r.URL.Path,
-				r.URL.RawQuery,
+				string(r.URI().Path()),
+				string(r.URI().QueryString()),
 				bodySign,
 			}, "\n")
 			sign := hs256(key, contentOfSign)
@@ -145,7 +148,7 @@ func TestContentSecurity(t *testing.T) {
 
 			header, err := ParseContentSecurity(map[string]codec.RsaDecrypter{
 				fingerprint(pubKey): dec,
-			}, r)
+			}, string(ctx.Request.Header.Peek(httpx.ContentSecurity)))
 			assert.Equal(t, test.err, err)
 			if err != nil {
 				return

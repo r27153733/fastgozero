@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"github.com/valyala/fasthttp"
 	"log"
 	"net"
 	"net/http"
@@ -53,7 +54,7 @@ func TestMustNewServer(t *testing.T) {
 
 	s := MustNewServer(c, withDialer(func(conf zrpc.RpcClientConf) zrpc.Client {
 		return zrpc.MustNewClient(conf, zrpc.WithDialOption(grpc.WithContextDialer(dialer())))
-	}), WithHeaderProcessor(func(header http.Header) []string {
+	}), WithHeaderProcessor(func(header *fasthttp.RequestHeader) []string {
 		return []string{"foo"}
 	}))
 	s.upstreams = []Upstream{

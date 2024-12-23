@@ -1,8 +1,9 @@
 package fileserver
 
 import (
+	"github.com/valyala/fasthttp"
 	"net/http"
-	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -65,22 +66,23 @@ func TestMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			middleware := Middleware(tt.path, http.Dir(tt.dir))
-			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusAlreadyReported)
-			})
+			middleware := Middleware(tt.path, os.DirFS(tt.dir))
+			nextHandler := func(ctx *fasthttp.RequestCtx) {
+				ctx.SetStatusCode(http.StatusAlreadyReported)
+			}
 
 			handlerToTest := middleware(nextHandler)
 
 			for i := 0; i < 2; i++ {
-				req := httptest.NewRequest(http.MethodGet, tt.requestPath, nil)
-				rr := httptest.NewRecorder()
+				ctx := new(fasthttp.RequestCtx)
+				ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+				ctx.Request.SetRequestURI(tt.requestPath)
 
-				handlerToTest.ServeHTTP(rr, req)
+				handlerToTest(ctx)
 
-				assert.Equal(t, tt.expectedStatus, rr.Code)
+				assert.Equal(t, tt.expectedStatus, ctx.Response.StatusCode())
 				if len(tt.expectedContent) > 0 {
-					assert.Equal(t, tt.expectedContent, rr.Body.String())
+					assert.Equal(t, tt.expectedContent, string(ctx.Response.Body()))
 				}
 			}
 		})

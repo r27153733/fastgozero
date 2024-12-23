@@ -1,8 +1,7 @@
 package token
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"github.com/valyala/fasthttp"
 	"testing"
 	"time"
 
@@ -31,7 +30,11 @@ func TestTokenParser(t *testing.T) {
 	}
 
 	for _, pair := range keys {
-		req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
+		ctx := new(fasthttp.RequestCtx)
+		ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+		ctx.Request.SetRequestURI("http://localhost")
+		req := &ctx.Request
+
 		token, err := buildToken(key, map[string]any{
 			"key": "value",
 		}, 3600)
@@ -50,13 +53,18 @@ func TestTokenParser_Expired(t *testing.T) {
 		key     = "14F17379-EB8F-411B-8F12-6929002DCA76"
 		prevKey = "B63F477D-BBA3-4E52-96D3-C0034C27694A"
 	)
-	req := httptest.NewRequest(http.MethodGet, "http://localhost", http.NoBody)
+
+	ctx := new(fasthttp.RequestCtx)
+	ctx.Request.Header.SetMethod(fasthttp.MethodGet)
+	ctx.Request.SetRequestURI("http://localhost")
+
 	token, err := buildToken(key, map[string]any{
 		"key": "value",
 	}, 3600)
 	assert.Nil(t, err)
-	req.Header.Set("Authorization", "Bearer "+token)
+	ctx.Request.Header.Set("Authorization", "Bearer "+token)
 
+	req := &ctx.Request
 	parser := NewTokenParser(WithResetDuration(time.Second))
 	tok, err := parser.ParseToken(req, key, prevKey)
 	assert.Nil(t, err)

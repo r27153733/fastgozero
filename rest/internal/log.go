@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/valyala/fasthttp"
+	"golang.org/x/net/context"
 	"sync"
 
 	"github.com/r27153733/fastgozero/core/logx"
@@ -34,7 +35,7 @@ func SetLogCollector(ctx *fasthttp.RequestCtx, lc *LogCollector) (free func()) {
 }
 
 // LogCollectorFromContext returns LogCollector from ctx.
-func LogCollectorFromContext(ctx *fasthttp.RequestCtx) *LogCollector {
+func LogCollectorFromContext(ctx context.Context) *LogCollector {
 	val := ctx.Value(logContextKey)
 	if val == nil {
 		return nil
