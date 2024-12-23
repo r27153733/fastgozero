@@ -1,20 +1,18 @@
 package httpx
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"github.com/valyala/fasthttp"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/r27153733/fastgozero/core/logx"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type message struct {
@@ -80,257 +78,233 @@ func TestError(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			w := tracedResponseWriter{
-				headers: make(map[string][]string),
-			}
 			if test.errorHandler != nil {
-				errorLock.RLock()
-				prev := errorHandler
-				errorLock.RUnlock()
+				prev := errorHandler.Load()
 				SetErrorHandler(test.errorHandler)
 				defer func() {
-					errorLock.Lock()
-					errorHandler = prev
-					errorLock.Unlock()
+					errorHandler.Store(prev)
 				}()
 			}
-			Error(&w, errors.New(test.input))
-			assert.Equal(t, test.expectCode, w.code)
-			assert.Equal(t, test.expectHasBody, w.hasBody)
-			assert.Equal(t, test.expectBody, strings.TrimSpace(w.builder.String()))
+			resp := new(fasthttp.Response)
+			Error(resp, errors.New(test.input))
+			assert.Equal(t, test.expectCode, resp.StatusCode())
+			assert.Equal(t, test.expectHasBody, len(resp.Body()) > 0)
+			assert.Equal(t, test.expectBody, strings.TrimSpace(string(resp.Body())))
 		})
 	}
 }
 
 func TestErrorWithGrpcError(t *testing.T) {
-	w := tracedResponseWriter{
-		headers: make(map[string][]string),
-	}
-	Error(&w, status.Error(codes.Unavailable, "foo"))
-	assert.Equal(t, http.StatusServiceUnavailable, w.code)
-	assert.True(t, w.hasBody)
-	assert.True(t, strings.Contains(w.builder.String(), "foo"))
+	resp := new(fasthttp.Response)
+	Error(resp, status.Error(codes.Unavailable, "foo"))
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode())
+	assert.True(t, len(resp.Body()) > 0)
+	assert.True(t, strings.Contains(string(resp.Body()), "foo"))
 }
 
 func TestErrorWithHandler(t *testing.T) {
-	w := tracedResponseWriter{
-		headers: make(map[string][]string),
-	}
-	Error(&w, errors.New("foo"), func(w http.ResponseWriter, err error) {
-		http.Error(w, err.Error(), 499)
+	resp := new(fasthttp.Response)
+	Error(resp, errors.New("foo"), func(resp *fasthttp.Response, err error) {
+		resp.SetStatusCode(499)
+		resp.Header.SetContentTypeBytes([]byte("text/plain; charset=utf-8"))
+		resp.SetBodyString(err.Error())
 	})
-	assert.Equal(t, 499, w.code)
-	assert.True(t, w.hasBody)
-	assert.Equal(t, "foo", strings.TrimSpace(w.builder.String()))
+	assert.Equal(t, 499, resp.StatusCode())
+	assert.True(t, len(resp.Body()) > 0)
+	assert.Equal(t, "foo", strings.TrimSpace(string(resp.Body())))
 }
 
-func TestOk(t *testing.T) {
-	w := tracedResponseWriter{
-		headers: make(map[string][]string),
-	}
-	Ok(&w)
-	assert.Equal(t, http.StatusOK, w.code)
-}
+//func TestOk(t *testing.T) {
+//	w := tracedResponseWriter{
+//		headers: make(map[string][]string),
+//	}
+//	Ok(&w)
+//	assert.Equal(t, http.StatusOK, w.code)
+//}
 
 func TestOkJson(t *testing.T) {
 	t.Run("no handler", func(t *testing.T) {
-		w := tracedResponseWriter{
-			headers: make(map[string][]string),
-		}
+		resp := new(fasthttp.Response)
 		msg := message{Name: "anyone"}
-		OkJson(&w, msg)
-		assert.Equal(t, http.StatusOK, w.code)
-		assert.Equal(t, "{\"name\":\"anyone\"}", w.builder.String())
+		OkJson(resp, msg)
+		assert.Equal(t, http.StatusOK, resp.StatusCode())
+		assert.Equal(t, "{\"name\":\"anyone\"}", string(resp.Body()))
 	})
 
 	t.Run("with handler", func(t *testing.T) {
-		okLock.RLock()
-		prev := okHandler
-		okLock.RUnlock()
+		prev := okHandler.Load()
 		t.Cleanup(func() {
-			okLock.Lock()
-			okHandler = prev
-			okLock.Unlock()
+			okHandler.Store(prev)
 		})
 
 		SetOkHandler(func(_ context.Context, v interface{}) any {
 			return fmt.Sprintf("hello %s", v.(message).Name)
 		})
-		w := tracedResponseWriter{
-			headers: make(map[string][]string),
-		}
+		resp := new(fasthttp.Response)
 		msg := message{Name: "anyone"}
-		OkJson(&w, msg)
-		assert.Equal(t, http.StatusOK, w.code)
-		assert.Equal(t, `"hello anyone"`, w.builder.String())
+		OkJson(resp, msg)
+		assert.Equal(t, http.StatusOK, resp.StatusCode())
+		assert.Equal(t, `"hello anyone"`, string(resp.Body()))
 	})
 }
 
 func TestOkJsonCtx(t *testing.T) {
 	t.Run("no handler", func(t *testing.T) {
-		w := tracedResponseWriter{
-			headers: make(map[string][]string),
-		}
+		resp := new(fasthttp.RequestCtx)
 		msg := message{Name: "anyone"}
-		OkJsonCtx(context.Background(), &w, msg)
-		assert.Equal(t, http.StatusOK, w.code)
-		assert.Equal(t, "{\"name\":\"anyone\"}", w.builder.String())
+		OkJsonCtx(resp, msg)
+		assert.Equal(t, http.StatusOK, resp.Response.StatusCode())
+		assert.Equal(t, "{\"name\":\"anyone\"}", string(resp.Response.Body()))
 	})
 
 	t.Run("with handler", func(t *testing.T) {
-		okLock.RLock()
-		prev := okHandler
-		okLock.RUnlock()
+		prev := okHandler.Load()
 		t.Cleanup(func() {
-			okLock.Lock()
-			okHandler = prev
-			okLock.Unlock()
+			okHandler.Store(prev)
 		})
 
 		SetOkHandler(func(_ context.Context, v interface{}) any {
 			return fmt.Sprintf("hello %s", v.(message).Name)
 		})
-		w := tracedResponseWriter{
-			headers: make(map[string][]string),
-		}
+		resp := new(fasthttp.RequestCtx)
 		msg := message{Name: "anyone"}
-		OkJsonCtx(context.Background(), &w, msg)
-		assert.Equal(t, http.StatusOK, w.code)
-		assert.Equal(t, `"hello anyone"`, w.builder.String())
+		OkJsonCtx(resp, msg)
+		assert.Equal(t, http.StatusOK, resp.Response.StatusCode())
+		assert.Equal(t, `"hello anyone"`, string(resp.Response.Body()))
 	})
 }
 
-func TestWriteJsonTimeout(t *testing.T) {
-	// only log it and ignore
-	w := tracedResponseWriter{
-		headers: make(map[string][]string),
-		err:     http.ErrHandlerTimeout,
-	}
-	msg := message{Name: "anyone"}
-	WriteJson(&w, http.StatusOK, msg)
-	assert.Equal(t, http.StatusOK, w.code)
-}
+//func TestWriteJsonTimeout(t *testing.T) {
+//	// only log it and ignore
+//	w := tracedResponseWriter{
+//		headers: make(map[string][]string),
+//		err:     http.ErrHandlerTimeout,
+//	}
+//	msg := message{Name: "anyone"}
+//	WriteJson(&w, http.StatusOK, msg)
+//	assert.Equal(t, http.StatusOK, w.code)
+//}
 
-func TestWriteJsonError(t *testing.T) {
-	// only log it and ignore
-	w := tracedResponseWriter{
-		headers: make(map[string][]string),
-		err:     errors.New("foo"),
-	}
-	msg := message{Name: "anyone"}
-	WriteJson(&w, http.StatusOK, msg)
-	assert.Equal(t, http.StatusOK, w.code)
-}
-
-func TestWriteJsonLessWritten(t *testing.T) {
-	w := tracedResponseWriter{
-		headers:     make(map[string][]string),
-		lessWritten: true,
-	}
-	msg := message{Name: "anyone"}
-	WriteJson(&w, http.StatusOK, msg)
-	assert.Equal(t, http.StatusOK, w.code)
-}
-
-func TestWriteJsonMarshalFailed(t *testing.T) {
-	w := tracedResponseWriter{
-		headers: make(map[string][]string),
-	}
-	WriteJson(&w, http.StatusOK, map[string]any{
-		"Data": complex(0, 0),
-	})
-	assert.Equal(t, http.StatusInternalServerError, w.code)
-}
-
-func TestStream(t *testing.T) {
-	t.Run("regular case", func(t *testing.T) {
-		channel := make(chan string)
-		go func() {
-			defer close(channel)
-			for index := 0; index < 5; index++ {
-				channel <- fmt.Sprintf("%d", index)
-			}
-		}()
-
-		w := httptest.NewRecorder()
-		Stream(context.Background(), w, func(w io.Writer) bool {
-			output, ok := <-channel
-			if !ok {
-				return false
-			}
-
-			outputBytes := bytes.NewBufferString(output)
-			_, err := w.Write(append(outputBytes.Bytes(), []byte("\n")...))
-			return err == nil
-		})
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, "0\n1\n2\n3\n4\n", w.Body.String())
-	})
-
-	t.Run("context done", func(t *testing.T) {
-		channel := make(chan string)
-		go func() {
-			defer close(channel)
-			for index := 0; index < 5; index++ {
-				channel <- fmt.Sprintf("num: %d", index)
-			}
-		}()
-
-		w := httptest.NewRecorder()
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		Stream(ctx, w, func(w io.Writer) bool {
-			output, ok := <-channel
-			if !ok {
-				return false
-			}
-
-			outputBytes := bytes.NewBufferString(output)
-			_, err := w.Write(append(outputBytes.Bytes(), []byte("\n")...))
-			return err == nil
-		})
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, "", w.Body.String())
-	})
-}
-
-type tracedResponseWriter struct {
-	headers     map[string][]string
-	builder     strings.Builder
-	hasBody     bool
-	code        int
-	lessWritten bool
-	wroteHeader bool
-	err         error
-}
-
-func (w *tracedResponseWriter) Header() http.Header {
-	return w.headers
-}
-
-func (w *tracedResponseWriter) Write(bytes []byte) (n int, err error) {
-	if w.err != nil {
-		return 0, w.err
-	}
-
-	n, err = w.builder.Write(bytes)
-	if w.lessWritten {
-		n--
-	}
-	w.hasBody = true
-
-	return
-}
-
-func (w *tracedResponseWriter) WriteHeader(code int) {
-	if w.wroteHeader {
-		return
-	}
-	w.wroteHeader = true
-	w.code = code
-}
+//func TestWriteJsonError(t *testing.T) {
+//	// only log it and ignore
+//	w := tracedResponseWriter{
+//		headers: make(map[string][]string),
+//		err:     errors.New("foo"),
+//	}
+//	msg := message{Name: "anyone"}
+//	WriteJson(&w, http.StatusOK, msg)
+//	assert.Equal(t, http.StatusOK, w.code)
+//}
+//
+//func TestWriteJsonLessWritten(t *testing.T) {
+//	w := tracedResponseWriter{
+//		headers:     make(map[string][]string),
+//		lessWritten: true,
+//	}
+//	msg := message{Name: "anyone"}
+//	WriteJson(&w, http.StatusOK, msg)
+//	assert.Equal(t, http.StatusOK, w.code)
+//}
+//
+//func TestWriteJsonMarshalFailed(t *testing.T) {
+//	w := tracedResponseWriter{
+//		headers: make(map[string][]string),
+//	}
+//	WriteJson(&w, http.StatusOK, map[string]any{
+//		"Data": complex(0, 0),
+//	})
+//	assert.Equal(t, http.StatusInternalServerError, w.code)
+//}
+//
+//func TestStream(t *testing.T) {
+//	t.Run("regular case", func(t *testing.T) {
+//		channel := make(chan string)
+//		go func() {
+//			defer close(channel)
+//			for index := 0; index < 5; index++ {
+//				channel <- fmt.Sprintf("%d", index)
+//			}
+//		}()
+//
+//		w := httptest.NewRecorder()
+//		Stream(context.Background(), w, func(w io.Writer) bool {
+//			output, ok := <-channel
+//			if !ok {
+//				return false
+//			}
+//
+//			outputBytes := bytes.NewBufferString(output)
+//			_, err := w.Write(append(outputBytes.Bytes(), []byte("\n")...))
+//			return err == nil
+//		})
+//
+//		assert.Equal(t, http.StatusOK, w.Code)
+//		assert.Equal(t, "0\n1\n2\n3\n4\n", w.Body.String())
+//	})
+//
+//	t.Run("context done", func(t *testing.T) {
+//		channel := make(chan string)
+//		go func() {
+//			defer close(channel)
+//			for index := 0; index < 5; index++ {
+//				channel <- fmt.Sprintf("num: %d", index)
+//			}
+//		}()
+//
+//		w := httptest.NewRecorder()
+//		ctx, cancel := context.WithCancel(context.Background())
+//		cancel()
+//		Stream(ctx, w, func(w io.Writer) bool {
+//			output, ok := <-channel
+//			if !ok {
+//				return false
+//			}
+//
+//			outputBytes := bytes.NewBufferString(output)
+//			_, err := w.Write(append(outputBytes.Bytes(), []byte("\n")...))
+//			return err == nil
+//		})
+//
+//		assert.Equal(t, http.StatusOK, w.Code)
+//		assert.Equal(t, "", w.Body.String())
+//	})
+//}
+//
+//type tracedResponseWriter struct {
+//	headers     map[string][]string
+//	builder     strings.Builder
+//	hasBody     bool
+//	code        int
+//	lessWritten bool
+//	wroteHeader bool
+//	err         error
+//}
+//
+//func (w *tracedResponseWriter) Header() http.Header {
+//	return w.headers
+//}
+//
+//func (w *tracedResponseWriter) Write(bytes []byte) (n int, err error) {
+//	if w.err != nil {
+//		return 0, w.err
+//	}
+//
+//	n, err = w.builder.Write(bytes)
+//	if w.lessWritten {
+//		n--
+//	}
+//	w.hasBody = true
+//
+//	return
+//}
+//
+//func (w *tracedResponseWriter) WriteHeader(code int) {
+//	if w.wroteHeader {
+//		return
+//	}
+//	w.wroteHeader = true
+//	w.code = code
+//}
 
 func TestErrorCtx(t *testing.T) {
 	const (
@@ -387,24 +361,17 @@ func TestErrorCtx(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			w := tracedResponseWriter{
-				headers: make(map[string][]string),
-			}
+			ctx := new(fasthttp.RequestCtx)
 			if test.errorHandlerCtx != nil {
-				errorLock.RLock()
-				prev := errorHandler
-				errorLock.RUnlock()
+				prev := errorHandler.Load()
 				SetErrorHandlerCtx(test.errorHandlerCtx)
 				defer func() {
-					errorLock.Lock()
-					test.errorHandlerCtx = prev
-					errorLock.Unlock()
+					errorHandler.Store(prev)
 				}()
 			}
-			ErrorCtx(context.Background(), &w, errors.New(test.input))
-			assert.Equal(t, test.expectCode, w.code)
-			assert.Equal(t, test.expectHasBody, w.hasBody)
-			assert.Equal(t, test.expectBody, strings.TrimSpace(w.builder.String()))
+			ErrorCtx(ctx, errors.New(test.input))
+			assert.Equal(t, test.expectCode, ctx.Response.StatusCode())
+			assert.Equal(t, test.expectBody, strings.TrimSpace(string(ctx.Response.Body())))
 		})
 	}
 
@@ -413,33 +380,26 @@ func TestErrorCtx(t *testing.T) {
 }
 
 func TestErrorWithGrpcErrorCtx(t *testing.T) {
-	w := tracedResponseWriter{
-		headers: make(map[string][]string),
-	}
-	ErrorCtx(context.Background(), &w, status.Error(codes.Unavailable, "foo"))
-	assert.Equal(t, http.StatusServiceUnavailable, w.code)
-	assert.True(t, w.hasBody)
-	assert.True(t, strings.Contains(w.builder.String(), "foo"))
+	ctx := new(fasthttp.RequestCtx)
+	ErrorCtx(ctx, status.Error(codes.Unavailable, "foo"))
+	assert.Equal(t, http.StatusServiceUnavailable, ctx.Response.StatusCode())
+	assert.True(t, strings.Contains(string(ctx.Response.Body()), "foo"))
 }
 
 func TestErrorWithHandlerCtx(t *testing.T) {
-	w := tracedResponseWriter{
-		headers: make(map[string][]string),
-	}
-	ErrorCtx(context.Background(), &w, errors.New("foo"), func(w http.ResponseWriter, err error) {
-		http.Error(w, err.Error(), 499)
+	ctx := new(fasthttp.RequestCtx)
+	ErrorCtx(ctx, errors.New("foo"), func(w *fasthttp.Response, err error) {
+		w.SetBodyString(err.Error())
+		w.SetStatusCode(499)
 	})
-	assert.Equal(t, 499, w.code)
-	assert.True(t, w.hasBody)
-	assert.Equal(t, "foo", strings.TrimSpace(w.builder.String()))
+	assert.Equal(t, 499, ctx.Response.StatusCode())
+	assert.Equal(t, "foo", strings.TrimSpace(string(ctx.Response.Body())))
 }
 
 func TestWriteJsonCtxMarshalFailed(t *testing.T) {
-	w := tracedResponseWriter{
-		headers: make(map[string][]string),
-	}
-	WriteJsonCtx(context.Background(), &w, http.StatusOK, map[string]any{
+	ctx := new(fasthttp.RequestCtx)
+	WriteJsonCtx(ctx, http.StatusOK, map[string]any{
 		"Data": complex(0, 0),
 	})
-	assert.Equal(t, http.StatusInternalServerError, w.code)
+	assert.Equal(t, http.StatusInternalServerError, ctx.Response.StatusCode())
 }

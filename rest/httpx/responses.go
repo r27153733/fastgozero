@@ -64,6 +64,11 @@ func OkJsonCtx(ctx *fasthttp.RequestCtx, v any) {
 // Notice: SetErrorHandler and SetErrorHandlerCtx set the same error handler.
 // Keeping both SetErrorHandler and SetErrorHandlerCtx is for backward compatibility.
 func SetErrorHandler(handler func(error) (int, any)) {
+	if handler == nil {
+		errorHandler.Store(nil)
+		return
+	}
+
 	f := func(_ context.Context, err error) (int, any) {
 		return handler(err)
 	}
@@ -74,11 +79,19 @@ func SetErrorHandler(handler func(error) (int, any)) {
 // Notice: SetErrorHandler and SetErrorHandlerCtx set the same error handler.
 // Keeping both SetErrorHandler and SetErrorHandlerCtx is for backward compatibility.
 func SetErrorHandlerCtx(handlerCtx func(context.Context, error) (int, any)) {
+	if handlerCtx == nil {
+		errorHandler.Store(nil)
+		return
+	}
 	errorHandler.Store(&handlerCtx)
 }
 
 // SetOkHandler sets the response handler, which is called on calling OkJson and OkJsonCtx.
 func SetOkHandler(handler func(context.Context, any) any) {
+	if handler == nil {
+		okHandler.Store(nil)
+		return
+	}
 	okHandler.Store(&handler)
 }
 
@@ -124,8 +137,9 @@ func buildErrorHandler(ctx context.Context) func(error) (int, any) {
 
 	var handler func(error) (int, any)
 	if handlerCtx != nil {
+		f := *handlerCtx
 		handler = func(err error) (int, any) {
-			return (*handlerCtx)(ctx, err)
+			return f(ctx, err)
 		}
 	}
 
@@ -187,6 +201,5 @@ func doWriteJson(w *fasthttp.Response, code int, v any) error {
 	w.Header.Set(ContentType, header.JsonContentType)
 	w.SetStatusCode(code)
 	w.AppendBody(bs)
-	w.Body()
 	return nil
 }
