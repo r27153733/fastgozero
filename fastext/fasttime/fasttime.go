@@ -6,20 +6,28 @@ import (
 )
 
 func init() {
-	t := time.Now()
-	currentTimestamp.Store(&t)
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		for tm := range ticker.C {
-			t := time.Unix(tm.Unix(), 0)
-			currentTimestamp.Store(&t)
+			t := tm.Unix()
+			currentTimestamp.Store(t)
 		}
 	}()
 }
 
-var currentTimestamp atomic.Pointer[time.Time]
+var currentTimestamp = func() *atomic.Int64 {
+	var x atomic.Int64
+	x.Store(time.Now().Unix())
+	return &x
+}()
+
+// UnixTimestamp returns the current unix timestamp in seconds.
+// It is faster than time.Now().Unix()
+func UnixTimestamp() int64 {
+	return currentTimestamp.Load()
+}
 
 func Timestamp() time.Time {
-	return *currentTimestamp.Load()
+	return time.Unix(UnixTimestamp(), 0)
 }
