@@ -5,7 +5,11 @@ import (
 	"time"
 )
 
-func init() {
+func Init() {
+	if !currentTimestamp.CompareAndSwap(0, time.Now().Unix()) {
+		return
+	}
+
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
@@ -16,11 +20,7 @@ func init() {
 	}()
 }
 
-var currentTimestamp = func() *atomic.Int64 {
-	var x atomic.Int64
-	x.Store(time.Now().Unix())
-	return &x
-}()
+var currentTimestamp atomic.Int64
 
 // UnixTimestamp returns the current unix timestamp in seconds.
 // It is faster than time.Now().Unix()

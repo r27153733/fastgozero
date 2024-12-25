@@ -2,6 +2,7 @@ package logx
 
 import (
 	"fmt"
+	"github.com/r27153733/fastgozero/fastext/fasttime"
 	"io"
 	"log"
 	"os"
@@ -296,6 +297,7 @@ func SetUp(c LogConf) (err error) {
 			timeFormat = c.TimeFormat
 			if !strings.Contains(timeFormat, "\\.") {
 				isSecondPrecision = true
+				fasttime.Init()
 			}
 		}
 

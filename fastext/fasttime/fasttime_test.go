@@ -6,7 +6,7 @@ import (
 )
 
 func TestUnixTimestamp(t *testing.T) {
-	time.Sleep(3 * time.Second)
+	Init()
 	tsExpected := time.Now().Unix()
 	ts := UnixTimestamp()
 	if ts-tsExpected > 1 {
@@ -15,7 +15,7 @@ func TestUnixTimestamp(t *testing.T) {
 }
 
 func TestTimestamp(t *testing.T) {
-	time.Sleep(3 * time.Second)
+	Init()
 	tsExpected := time.Now()
 	ts := Timestamp()
 	if ts.Sub(tsExpected) > time.Second {
