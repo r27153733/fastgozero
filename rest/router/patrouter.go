@@ -11,7 +11,7 @@ import (
 	"github.com/r27153733/fastgozero/core/search"
 	"github.com/r27153733/fastgozero/fastext/bytesconv"
 	"github.com/r27153733/fastgozero/rest/httpx"
-	"github.com/r27153733/fastgozero/rest/pathvar"
+	"github.com/r27153733/fastgozero/rest/router/pathvar"
 	"github.com/valyala/fasthttp"
 )
 
@@ -67,7 +67,7 @@ func (pr *patRouter) ServeHTTP(ctx *fasthttp.RequestCtx) {
 	if tree := pr.trees[methodIndexOf(bytesconv.BToS(ctx.Method()))]; tree != nil {
 		if result, ok := tree.Search(reqPath); ok {
 			if len(result.Params) > 0 {
-				free := pathvar.SetVars(ctx, result.Params)
+				free := pathvar.SetVars(ctx, pathvar.MapParams(result.Params))
 				defer free()
 			}
 			result.Item.(fasthttp.RequestHandler)(ctx)
